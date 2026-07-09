@@ -854,7 +854,15 @@ class BaselineRTDP:
                 ):
                     stop_reason = "stable_trials"
                     break
-                self._check_deadline(deadline)
+                
+                try:
+                    self._check_deadline(deadline)
+                except _DeadlineReached:
+                    stop_reason = "time_limit"
+                    break
+                except _MemoryLimitReached:
+                    stop_reason = "memory_limit"
+                    break
         finally:
             snapshot = monitor.stop()
             self._resource_monitor = None
