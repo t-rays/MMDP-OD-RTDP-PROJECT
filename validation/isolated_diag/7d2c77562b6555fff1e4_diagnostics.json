@@ -1,0 +1,236 @@
+{
+  "summary": {
+    "policy_name": "OperatorDecompositionRTDP",
+    "map_name": "crossing-9-9",
+    "scenario_name": "crossing-9-9-diagnostic-1.scen",
+    "n_agents": 2,
+    "evaluation_seed": 4705193143269049553,
+    "episodes": 2,
+    "max_steps_per_episode": 60,
+    "randomize_greedy_ties": false,
+    "cache_only_executed_actions": true,
+    "collect_diagnostics": true,
+    "successful_episodes": 0,
+    "failed_episodes": 2,
+    "success_rate": 0.0,
+    "total_environment_steps": 15,
+    "mean_steps_all_episodes": 7.5,
+    "mean_steps_successful_episodes": null,
+    "mean_accumulated_cost_all_episodes": 15.0,
+    "mean_sum_of_costs_successful_episodes": null,
+    "std_sum_of_costs_successful_episodes": null,
+    "mean_makespan_successful_episodes": null,
+    "std_makespan_successful_episodes": null,
+    "per_agent_arrival_rates": [
+      0.0,
+      0.0
+    ],
+    "per_agent_mean_arrival_times": [
+      null,
+      null
+    ],
+    "mean_arrived_agents_per_episode": 0.0,
+    "expected_conflict_attempts_per_episode": 0.0,
+    "mean_conflict_risk_per_environment_step": 0.0,
+    "mean_expected_self_loop_probability_per_step": 0.2693333333333333,
+    "mean_expected_shortest_path_progress_per_step": 0.7999999999999987,
+    "mean_expected_vertex_conflict_probability_per_step": 0.0,
+    "mean_expected_edge_swap_probability_per_step": 0.0,
+    "mean_expected_noncollision_no_motion_probability_per_step": 0.2693333333333333,
+    "mean_selected_unfinished_stay_actions_per_episode": 2.0,
+    "mean_selected_unfinished_blocked_actions_per_episode": 4.5,
+    "deterministic_self_loop_failures": 2,
+    "step_limit_failures": 0,
+    "evaluation_elapsed_seconds": 0.008129904999805149,
+    "evaluation_baseline_rss_mb": 289.3125,
+    "evaluation_peak_rss_mb": 289.3125,
+    "evaluation_peak_rss_delta_mb": 0.0,
+    "total_policy_decision_seconds": 0.005639410001094802,
+    "mean_policy_decision_milliseconds": 0.3759606667396535,
+    "policy_cache_hits": 3,
+    "policy_cache_misses": 14,
+    "policy_cache_entries": 14,
+    "policy_cache_hit_rate": 0.17647058823529413,
+    "transition_raw_cache_entries_before": 1460,
+    "transition_raw_cache_entries_after": 1462,
+    "transition_resolved_cache_entries_before": 1460,
+    "transition_resolved_cache_entries_after": 1462,
+    "transition_raw_cache_hits": 56,
+    "transition_raw_cache_misses": 54,
+    "transition_raw_cache_writes": 2,
+    "transition_raw_cache_evictions": 0,
+    "transition_resolved_cache_hits": 144,
+    "transition_resolved_cache_misses": 38,
+    "transition_resolved_cache_writes": 2,
+    "transition_resolved_cache_evictions": 0,
+    "mean_unique_states_visited": 7.5,
+    "mean_repeated_state_visits": 1.0,
+    "mean_maximum_state_visit_count": 1.5,
+    "mean_self_transitions": 1.0,
+    "mean_maximum_consecutive_self_transitions": 0.5,
+    "mean_tie_decisions": 5.0,
+    "mean_unique_real_states_with_policy_ties": 3.5,
+    "mean_tie_decisions_per_environment_step": 0.6666666666666666
+  },
+  "failed_episodes": [
+    {
+      "episode_index": 0,
+      "episode_seed": 4779270885749211122,
+      "success": false,
+      "hit_step_limit": false,
+      "steps": 8,
+      "accumulated_cost": 16.0,
+      "makespan": null,
+      "arrival_times": [
+        null,
+        null
+      ],
+      "arrived_agents": 0,
+      "cumulative_conflict_risk": 0.0,
+      "mean_conflict_risk_per_step": 0.0,
+      "policy_decision_seconds": 0.0021219410009507556,
+      "episode_elapsed_seconds": 0.0028026950003550155,
+      "unique_states_visited": 7,
+      "repeated_state_visits": 2,
+      "maximum_state_visit_count": 2,
+      "self_transitions": 2,
+      "maximum_consecutive_self_transitions": 1,
+      "tie_decisions": 6,
+      "unique_real_states_with_policy_ties": 4,
+      "cumulative_expected_self_loop_probability": 2.44,
+      "mean_expected_self_loop_probability_per_step": 0.305,
+      "cumulative_expected_shortest_path_progress": 5.599999999999991,
+      "mean_expected_shortest_path_progress_per_step": 0.6999999999999988,
+      "cumulative_expected_vertex_conflict_probability": 0.0,
+      "cumulative_expected_edge_swap_probability": 0.0,
+      "cumulative_expected_noncollision_no_motion_probability": 2.44,
+      "mean_expected_vertex_conflict_probability_per_step": 0.0,
+      "mean_expected_edge_swap_probability_per_step": 0.0,
+      "mean_expected_noncollision_no_motion_probability_per_step": 0.305,
+      "selected_unfinished_stay_actions": 2,
+      "selected_unfinished_blocked_actions": 7,
+      "deterministic_self_loop_actions": 1,
+      "failure_reason": "deterministic_self_loop_policy",
+      "repeated_state_action_pairs": [
+        {
+          "state": [
+            [
+              0,
+              4
+            ],
+            [
+              4,
+              5
+            ]
+          ],
+          "action": [
+            "right",
+            "left"
+          ],
+          "count": 2,
+          "risk": {
+            "self_loop_probability": 0.2,
+            "conflict_probability": 0.0,
+            "vertex_conflict_probability": 0.0,
+            "edge_swap_probability": 0.0,
+            "noncollision_no_motion_probability": 0.2,
+            "unfinished_stay_actions": 0,
+            "unfinished_blocked_actions": 1,
+            "movable_unfinished_actions": 1,
+            "frozen_agents": 0
+          }
+        },
+        {
+          "state": [
+            [
+              0,
+              4
+            ],
+            [
+              7,
+              4
+            ]
+          ],
+          "action": [
+            "down",
+            "left"
+          ],
+          "count": 2,
+          "risk": {
+            "self_loop_probability": 0.2,
+            "conflict_probability": 0.0,
+            "vertex_conflict_probability": 0.0,
+            "edge_swap_probability": 0.0,
+            "noncollision_no_motion_probability": 0.2,
+            "unfinished_stay_actions": 0,
+            "unfinished_blocked_actions": 1,
+            "movable_unfinished_actions": 1,
+            "frozen_agents": 0
+          }
+        }
+      ],
+      "final_state": [
+        [
+          1,
+          4
+        ],
+        [
+          4,
+          5
+        ]
+      ]
+    },
+    {
+      "episode_index": 1,
+      "episode_seed": 4976159342254661994,
+      "success": false,
+      "hit_step_limit": false,
+      "steps": 7,
+      "accumulated_cost": 14.0,
+      "makespan": null,
+      "arrival_times": [
+        null,
+        null
+      ],
+      "arrived_agents": 0,
+      "cumulative_conflict_risk": 0.0,
+      "mean_conflict_risk_per_step": 0.0,
+      "policy_decision_seconds": 0.0035174690001440467,
+      "episode_elapsed_seconds": 0.004094661999261007,
+      "unique_states_visited": 8,
+      "repeated_state_visits": 0,
+      "maximum_state_visit_count": 1,
+      "self_transitions": 0,
+      "maximum_consecutive_self_transitions": 0,
+      "tie_decisions": 4,
+      "unique_real_states_with_policy_ties": 3,
+      "cumulative_expected_self_loop_probability": 1.6,
+      "mean_expected_self_loop_probability_per_step": 0.2285714285714286,
+      "cumulative_expected_shortest_path_progress": 6.39999999999999,
+      "mean_expected_shortest_path_progress_per_step": 0.9142857142857128,
+      "cumulative_expected_vertex_conflict_probability": 0.0,
+      "cumulative_expected_edge_swap_probability": 0.0,
+      "cumulative_expected_noncollision_no_motion_probability": 1.6,
+      "mean_expected_vertex_conflict_probability_per_step": 0.0,
+      "mean_expected_edge_swap_probability_per_step": 0.0,
+      "mean_expected_noncollision_no_motion_probability_per_step": 0.2285714285714286,
+      "selected_unfinished_stay_actions": 2,
+      "selected_unfinished_blocked_actions": 2,
+      "deterministic_self_loop_actions": 1,
+      "failure_reason": "deterministic_self_loop_policy",
+      "repeated_state_action_pairs": [],
+      "final_state": [
+        [
+          5,
+          4
+        ],
+        [
+          8,
+          4
+        ]
+      ]
+    }
+  ],
+  "global_od_summary": null,
+  "global_od_failed_episodes": []
+}

@@ -1,0 +1,35 @@
+{
+  "output": "results/medium_time_60s.csv",
+  "master_seed": 20260708,
+  "seed_count": 3,
+  "algorithms": [
+    "baseline",
+    "od"
+  ],
+  "resource_modes": [
+    "time"
+  ],
+  "experiments_args": {
+    "time_limit_seconds": 60,
+    "evaluation_episodes": 30,
+    "evaluation_max_steps": null,
+    "transition_cache_max_entries": "none"
+  },
+  "maps": [
+    {
+      "folder": "maps/maze-32-32-2",
+      "agent_counts": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "scenario_numbers": [
+        2
+      ],
+      "task_offsets": [
+        0
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "calibration": {
+    "budget_definition": "For each scenario/offset/seed pair, take the maximum requirement across the required algorithms; then take the requested empirical quantile.",
+    "calibration_policy": "paired_max",
+    "memory_definition": "additional planning RSS above fresh-process baseline",
+    "memory_fraction": 1.0,
+    "memory_rounding_mb": null,
+    "quantile": 0.5,
+    "required_algorithms": [
+      "baseline",
+      "od"
+    ],
+    "source_csv": "/mnt/data/final_project_v7/validation/v7_unconstrained_smoke.csv",
+    "source_resource_mode": "unconstrained",
+    "time_fraction": 1.0,
+    "time_rounding_seconds": null
+  },
+  "maps": {
+    "crossing-9-9": {
+      "agents": {
+        "2": {
+          "memory_limit_mb": 2.67578125,
+          "memory_observed": {
+            "maximum": 2.67578125,
+            "median": 2.67578125,
+            "minimum": 2.67578125
+          },
+          "memory_reference_mb": 2.67578125,
+          "source_observations": 1,
+          "time_limit_seconds": 1.3183952259987564,
+          "time_observed": {
+            "maximum": 1.3183952259987564,
+            "median": 1.3183952259987564,
+            "minimum": 1.3183952259987564
+          },
+          "time_reference_seconds": 1.3183952259987564
+        }
+      }
+    }
+  },
+  "omitted_observations": [],
+  "profile_name": "paired-median-from-unconstrained-pilots"
+}

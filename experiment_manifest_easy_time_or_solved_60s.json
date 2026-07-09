@@ -1,0 +1,35 @@
+{
+  "master_seed": 20260708,
+  "seed_count": 3,
+  "algorithms": [
+    "baseline",
+    "od"
+  ],
+  "resource_modes": [
+    "custom"
+  ],
+  "experiments_args": {
+    "time_limit_seconds": 60,
+    "stop_when_solved": true,
+    "evaluation_episodes": 30,
+    "transition_cache_max_entries": "none"
+  },
+  "output": "results/easy_time_or_solved_60s.csv",
+  "maps": [
+    {
+      "folder": "maps/empty-8-8",
+      "agent_counts": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "scenario_numbers": [
+        1
+      ],
+      "task_offsets": [
+        0
+      ]
+    }
+  ]
+}
