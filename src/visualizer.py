@@ -25,7 +25,7 @@ class TrajectoryVisualizer:
             # Select action
             action = self.planner.policy_action(state, tie_rng=rng)
             # Step environment
-            state, _ = self.mdp.sample_next(state, action, rng)
+            state = self.mdp.sample_next(state, action, rng)
             self.trajectory.append(state)
             step_count += 1
             
@@ -38,7 +38,7 @@ class TrajectoryVisualizer:
         self.colors = ['#ff7675', '#74b9ff', '#00b894', '#e17055', '#0984e3', '#b2bec3']
         
     def draw_grid(self, ax):
-        grid = self.mdp.map_instance.grid_map
+        grid = self.mdp.instance.grid_map
         ax.clear()
         ax.set_xlim(-0.5, grid.width - 0.5)
         ax.set_ylim(-0.5, grid.height - 0.5)
@@ -52,7 +52,7 @@ class TrajectoryVisualizer:
             ax.add_patch(Rectangle((x-0.5, y-0.5), 1, 1, facecolor='#2d3436'))
             
         # Draw goals
-        for i, (gx, gy) in enumerate(self.mdp.map_instance.goals):
+        for i, (gx, gy) in enumerate(self.mdp.instance.goals):
             color = self.colors[i % len(self.colors)]
             ax.add_patch(Rectangle((gx-0.5, gy-0.5), 1, 1, facecolor=color, alpha=0.3))
             ax.text(gx, gy, f"G{i}", ha='center', va='center', fontweight='bold')
@@ -64,7 +64,7 @@ class TrajectoryVisualizer:
         self.draw_grid(self.ax)
         
         if not self.trajectory:
-            self.ax.text(self.mdp.map_instance.grid_map.width/2, self.mdp.map_instance.grid_map.height/2, 
+            self.ax.text(self.mdp.instance.grid_map.width/2, self.mdp.instance.grid_map.height/2, 
                          "No trajectory data", ha='center', va='center')
             self.fig.canvas.draw()
             return
@@ -72,8 +72,8 @@ class TrajectoryVisualizer:
         state = self.trajectory[step]
         
         # Draw agents
-        for i, pos in enumerate(state.agent_positions):
-            if pos != self.mdp.map_instance.goals[i]: # If not at goal
+        for i, pos in enumerate(state):
+            if pos != self.mdp.instance.goals[i]: # If not at goal
                 color = self.colors[i % len(self.colors)]
                 self.ax.add_patch(Circle((pos[0], pos[1]), 0.4, facecolor=color))
                 self.ax.text(pos[0], pos[1], str(i), ha='center', va='center', color='white', fontweight='bold')
