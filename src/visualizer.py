@@ -122,34 +122,32 @@ class TrajectoryVisualizer:
                     
         slider.observe(on_change)
         
-        self.playing = False
+        hidden_play = widgets.Play(min=0, max=self.max_steps, step=1, interval=400, show_repeat=False)
+        widgets.jslink((hidden_play, 'value'), (slider, 'value'))
+        
         play_btn = widgets.Button(description='▶ Play', button_style='success')
         
-        def play_loop():
-            import time
-            while self.playing and slider.value < self.max_steps:
-                time.sleep(0.5)
-                # We must update the slider value, which will trigger the on_change callback
-                slider.value += 1
-            self.playing = False
-            play_btn.description = '▶ Play'
-            play_btn.button_style = 'success'
-            
         def on_play_clicked(b):
-            if not self.playing:
-                self.playing = True
-                play_btn.description = '⏸ Pause'
-                play_btn.button_style = 'warning'
+            if not hidden_play.playing:
                 if slider.value == self.max_steps:
                     slider.value = 0
-                import threading
-                threading.Thread(target=play_loop).start()
+                    hidden_play.value = 0
+                hidden_play.playing = True
+                play_btn.description = '⏸ Pause'
+                play_btn.button_style = 'warning'
             else:
-                self.playing = False
+                hidden_play.playing = False
                 play_btn.description = '▶ Play'
                 play_btn.button_style = 'success'
                 
+        def on_play_state_change(change):
+            if not change['new']: # Stopped playing
+                play_btn.description = '▶ Play'
+                play_btn.button_style = 'success'
+                
+        hidden_play.observe(on_play_state_change, names='playing')
         play_btn.on_click(on_play_clicked)
+        
         controls = widgets.HBox([play_btn, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
         
         left_side = widgets.VBox([grid_output, controls], layout=widgets.Layout(align_items='center'))
