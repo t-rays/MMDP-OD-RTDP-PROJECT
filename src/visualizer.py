@@ -122,9 +122,10 @@ class TrajectoryVisualizer:
                     
         slider.observe(on_change)
         
-        play = widgets.Play(min=0, max=self.max_steps, step=1, interval=400, description="Press play")
+        play = widgets.Play(min=0, max=self.max_steps, step=1, interval=400, show_repeat=False)
         widgets.jslink((play, 'value'), (slider, 'value'))
-        controls = widgets.HBox([play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
+        play_label = widgets.Label(value="▶ Play/Stop (Icons may be hidden in VSCode):")
+        controls = widgets.HBox([play_label, play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
         
         left_side = widgets.VBox([grid_output, controls], layout=widgets.Layout(align_items='center'))
             
