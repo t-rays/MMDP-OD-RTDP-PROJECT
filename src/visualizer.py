@@ -279,10 +279,16 @@ class TrajectoryVisualizer:
                             val = self.planner.real_state_value(s_prime) if hasattr(self.planner, 'real_state_value') else self.planner.value(s_prime)
                             dyn_heatmap[y, x] = val
                             
-            hm_cmap = copy.copy(plt.get_cmap('magma'))
+            hm_cmap = copy.copy(plt.get_cmap('RdYlGn'))
             hm_cmap.set_bad(color='#2d3436')
             
-            self.ax_heatmap.imshow(dyn_heatmap, cmap=hm_cmap, extent=[-0.5, grid.width-0.5, grid.height-0.5, -0.5], origin='upper', interpolation='nearest', alpha=0.85)
+            img = self.ax_heatmap.imshow(dyn_heatmap, cmap=hm_cmap, extent=[-0.5, grid.width-0.5, grid.height-0.5, -0.5], origin='upper', interpolation='nearest', alpha=0.6)
+            
+            if not hasattr(self, 'cbar') or self.cbar is None:
+                self.cbar = self.fig.colorbar(img, ax=self.ax_heatmap, fraction=0.046, pad=0.04)
+                self.cbar.set_label("State Value (Q)")
+            else:
+                self.cbar.update_normal(img)
             
             for i, pos in enumerate(state):
                 color = self.colors[i % len(self.colors)]
