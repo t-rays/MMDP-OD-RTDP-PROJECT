@@ -178,6 +178,8 @@ class TrajectoryVisualizer:
         self.colors = ['#ff7675', '#74b9ff', '#00b894', '#e17055', '#0984e3', '#b2bec3']
         self.tree_html = widgets.HTML(value="")
         self.bellman_html = widgets.HTML(value="")
+        self.tree_zoom = 1.0
+        self._last_svgs = ("", "")
         
     def draw_grid(self, ax):
         grid = self.mdp.instance.grid_map
@@ -311,7 +313,8 @@ class TrajectoryVisualizer:
             slip_rate = getattr(self.mdp.config, 'slip_to_stay_probability', 0.1)
             tv = TreeVisualizer(self.mdp.n_agents, slip_rate)
             svg_no, svg_od = tv.add_step(step, decision, info)
-            self.tree_html.value = f"<div style='display: flex; flex-direction: column; gap: 20px; align-items: center;'>{svg_no}{svg_od}</div>"
+            self._last_svgs = (svg_no, svg_od)
+            self.update_tree_html()
         except Exception as e:
             import traceback
             err = traceback.format_exc()
@@ -319,6 +322,12 @@ class TrajectoryVisualizer:
             
         self.bellman_html.value = _generate_bellman_html(self.mdp, self.planner, state, act)
         
+
+    def update_tree_html(self):
+        svg_no, svg_od = getattr(self, '_last_svgs', ("", ""))
+        zoom = getattr(self, 'tree_zoom', 1.0)
+        self.tree_html.value = f"<div style='overflow: auto; max-height: 800px; width: 100%; border: 1px solid #ddd; padding: 20px; background: #fafafa;'><div style='display: flex; flex-direction: column; gap: 40px; align-items: center; transform: scale({zoom}); transform-origin: top center; transition: transform 0.1s ease-in-out;'>{svg_no}{svg_od}</div></div>"
+    
     def show_with_tree(self):
         if not self.trajectory:
             print("No trajectory found to visualize.")
@@ -357,12 +366,18 @@ class TrajectoryVisualizer:
         </style>
         """)
         
-        controls = widgets.HBox([icon_fix_css, play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
+                zoom_slider = widgets.FloatSlider(value=1.0, min=0.1, max=3.0, step=0.1, description='Tree Zoom:')
+        def on_zoom(change):
+            self.tree_zoom = change['new']
+            self.update_tree_html()
+        zoom_slider.observe(on_zoom, names='value')
+        
+        controls = widgets.HBox([icon_fix_css, play, slider, zoom_slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
         
         left_side = widgets.VBox([grid_output, controls, self.bellman_html], layout=widgets.Layout(align_items='center'))
             
         # Combine Side-by-Side
-        main_layout = widgets.HBox([left_side, self.tree_html], layout=widgets.Layout(align_items='center', justify_content='space-around'))
+        main_layout = widgets.VBox([left_side, self.tree_html], layout=widgets.Layout(align_items='center'))
         display(main_layout)
 
 
@@ -395,6 +410,8 @@ class DualTrajectoryVisualizer:
         self.tree_html = widgets.HTML(value="")
         self.bellman_base_html = widgets.HTML(value="")
         self.bellman_od_html = widgets.HTML(value="")
+        self.tree_zoom = 1.0
+        self._last_svgs = ("", "")
         self.baseline_planner = baseline_planner
         self.od_planner = od_planner
         
@@ -533,12 +550,19 @@ class DualTrajectoryVisualizer:
             slip_rate = getattr(self.mdp.config, 'slip_to_stay_probability', 0.1)
             tv = TreeVisualizer(self.mdp.n_agents, slip_rate)
             svg_no, svg_od = tv.add_step(s_idx2, decision, info)
-            self.tree_html.value = f"<div style='display: flex; flex-direction: column; gap: 20px; align-items: center;'>{svg_no}{svg_od}</div>"
+            self._last_svgs = (svg_no, svg_od)
+            self.update_tree_html()
         except Exception as e:
             import traceback
             err = traceback.format_exc()
             self.tree_html.value = f"<b style='color:red;'>Graphviz error: {e}<br><pre>{err}</pre></b><br>Make sure 'graphviz' is installed."
         
+
+    def update_tree_html(self):
+        svg_no, svg_od = getattr(self, '_last_svgs', ("", ""))
+        zoom = getattr(self, 'tree_zoom', 1.0)
+        self.tree_html.value = f"<div style='overflow: auto; max-height: 800px; width: 100%; border: 1px solid #ddd; padding: 20px; background: #fafafa;'><div style='display: flex; flex-direction: column; gap: 40px; align-items: center; transform: scale({zoom}); transform-origin: top center; transition: transform 0.1s ease-in-out;'>{svg_no}{svg_od}</div></div>"
+    
     def show_with_tree(self):
         if not self.traj_base and not self.traj_od:
             print("No trajectory found to visualize.")
@@ -573,6 +597,12 @@ class DualTrajectoryVisualizer:
         </style>
         """)
         
-        controls = widgets.HBox([icon_fix_css, play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
+                zoom_slider = widgets.FloatSlider(value=1.0, min=0.1, max=3.0, step=0.1, description='Tree Zoom:')
+        def on_zoom(change):
+            self.tree_zoom = change['new']
+            self.update_tree_html()
+        zoom_slider.observe(on_zoom, names='value')
+        
+        controls = widgets.HBox([icon_fix_css, play, slider, zoom_slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
         bellmans = widgets.HBox([self.bellman_base_html, self.bellman_od_html], layout=widgets.Layout(justify_content='space-around', width='100%'))
         display(widgets.VBox([grid_output, controls, bellmans, self.tree_html], layout=widgets.Layout(align_items='center')))
