@@ -122,37 +122,11 @@ class TrajectoryVisualizer:
                     
         slider.observe(on_change)
         
-        self.playing = False
-        play_btn = widgets.Button(description='▶ Play', button_style='success')
+        play = widgets.Play(min=0, max=self.max_steps, step=1, interval=400, show_repeat=False)
+        widgets.jslink((play, 'value'), (slider, 'value'))
+        play_label = widgets.Label(value="▶ Play/Pause (Icons may be invisible in VSCode):")
         
-        def play_loop():
-            import time
-            while self.playing and slider.value < self.max_steps:
-                time.sleep(0.5)
-                slider.value += 1
-            self.playing = False
-            play_btn.description = '▶ Play'
-            play_btn.button_style = 'success'
-            
-        def on_play_clicked(b):
-            if not self.playing:
-                self.playing = True
-                play_btn.description = '⏸ Pause'
-                play_btn.button_style = 'warning'
-                if slider.value == self.max_steps:
-                    slider.value = 0
-                import threading
-                thread = threading.Thread(target=play_loop)
-                thread.daemon = True
-                thread.start()
-            else:
-                self.playing = False
-                play_btn.description = '▶ Play'
-                play_btn.button_style = 'success'
-                
-        play_btn.on_click(on_play_clicked)
-        
-        controls = widgets.HBox([play_btn, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
+        controls = widgets.HBox([play_label, play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
         
         left_side = widgets.VBox([grid_output, controls], layout=widgets.Layout(align_items='center'))
             
