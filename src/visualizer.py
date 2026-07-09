@@ -49,6 +49,85 @@ def _generate_bellman_html(mdp, planner, state, action):
     """
     return html
 
+
+def _build_tree_decision_context(mdp, planner, state, chosen_action, next_state=None):
+    decision = {}
+    info = {}
+    ACTIONS = ['N', 'S', 'E', 'W', 'stay']
+    
+    # 1. Joint Scores
+    scores = []
+    chosen_idx = -1
+    best_idx = -1
+    best_val = -float('inf')
+    
+    import itertools
+    all_joint = list(itertools.product(ACTIONS, repeat=mdp.n_agents))
+    for i, joint_a in enumerate(all_joint):
+        val = planner.complete_joint_action_value(state, joint_a, count_metrics=False)
+        scores.append(val)
+        if val > best_val:
+            best_val = val
+            best_idx = i
+        if chosen_action and tuple(joint_a) == tuple(chosen_action):
+            chosen_idx = i
+            
+    decision['joint_scores'] = scores
+    decision['chosen_idx'] = chosen_idx
+    decision['joint_best_idx'] = best_idx
+    
+    # 2. OD Actions & Q Values
+    od_actions = []
+    if chosen_action:
+        od_actions = [ACTIONS.index(a) for a in chosen_action]
+    decision['od_actions'] = od_actions
+    
+    od_q = []
+    reserved_targets = []
+    
+    if hasattr(planner, 'operator_value'):
+        prefix = ()
+        for i in range(mdp.n_agents):
+            agent_q = []
+            for a in ACTIONS:
+                v = planner.operator_value((state, prefix), a, count_metrics=False)
+                agent_q.append(v)
+            od_q.append(agent_q)
+            if chosen_action:
+                prefix = prefix + (chosen_action[i],)
+                curr_pos = state[i]
+                # Fallback vectors
+                vectors = {'N': (0, -1), 'S': (0, 1), 'E': (1, 0), 'W': (-1, 0), 'stay': (0, 0)}
+                dx, dy = vectors[chosen_action[i]]
+                reserved_targets.append(f"({curr_pos[0]+dx}, {curr_pos[1]+dy})")
+    
+    decision['od_q'] = od_q
+    decision['reserved_targets'] = reserved_targets
+    
+    # 3. Info (Slip)
+    executed = []
+    slipped = []
+    if next_state and chosen_action:
+        vectors = {'N': (0, -1), 'S': (0, 1), 'E': (1, 0), 'W': (-1, 0), 'stay': (0, 0)}
+        for i in range(mdp.n_agents):
+            curr_pos = state[i]
+            dx, dy = vectors[chosen_action[i]]
+            intended = (curr_pos[0]+dx, curr_pos[1]+dy)
+            actual = next_state[i]
+            
+            actual_action = 'stay'
+            for a, (ax, ay) in vectors.items():
+                if (curr_pos[0]+ax, curr_pos[1]+ay) == actual:
+                    actual_action = a
+                    break
+            executed.append(ACTIONS.index(actual_action))
+            slipped.append(actual != intended)
+            
+    info['executed'] = executed
+    info['slipped'] = slipped
+    
+    return decision, info
+
 class TrajectoryVisualizer:
     def __init__(self, mdp: GridMMDP, planner, max_steps: int = 50, seed: int = 42, show_trails: bool = True, show_heatmap: bool = False, heatmap_agent: int = 0, dynamic_projection: bool = False):
         self.mdp = mdp
@@ -217,14 +296,20 @@ class TrajectoryVisualizer:
         self.fig.canvas.draw()
         
         # Update SVG trees
-        from tree_visualizer import BranchingTreeVisualizer
+        from tree_visualizer import TreeVisualizer
         try:
-            # If we are at the very last step, there is no "next" action, so show the previous action or None
             act = self.actions[step] if step < len(self.actions) else None
-            svg_no, svg_od = BranchingTreeVisualizer.generate_trees_svg(self.mdp.n_agents, step, act)
+            next_state = self.trajectory[step+1] if step+1 < len(self.trajectory) else None
+            decision, info = _build_tree_decision_context(self.mdp, self.planner, state, act, next_state)
+            
+            slip_rate = getattr(self.mdp.config, 'slip_to_stay_probability', 0.1)
+            tv = TreeVisualizer(self.mdp.n_agents, slip_rate)
+            svg_no, svg_od = tv.add_step(step, decision, info)
             self.tree_html.value = f"<div style='display: flex; flex-direction: column; gap: 20px; align-items: center;'>{svg_no}{svg_od}</div>"
         except Exception as e:
-            self.tree_html.value = f"<b style='color:red;'>Graphviz error: {e}</b><br>Make sure 'graphviz' is installed."
+            import traceback
+            err = traceback.format_exc()
+            self.tree_html.value = f"<b style='color:red;'>Graphviz error: {e}<br><pre>{err}</pre></b><br>Make sure 'graphviz' is installed."
             
         self.bellman_html.value = _generate_bellman_html(self.mdp, self.planner, state, act)
         
@@ -433,13 +518,20 @@ class DualTrajectoryVisualizer:
         
         self.fig.canvas.draw()
         
-        from tree_visualizer import BranchingTreeVisualizer
+        from tree_visualizer import TreeVisualizer
         try:
             act = self.actions_od[s_idx2] if s_idx2 < len(self.actions_od) else None
-            svg_no, svg_od = BranchingTreeVisualizer.generate_trees_svg(self.mdp.n_agents, s_idx2, act)
+            next_state = self.traj_od[s_idx2+1] if s_idx2+1 < len(self.traj_od) else None
+            decision, info = _build_tree_decision_context(self.mdp, self.od_planner, state2, act, next_state)
+            
+            slip_rate = getattr(self.mdp.config, 'slip_to_stay_probability', 0.1)
+            tv = TreeVisualizer(self.mdp.n_agents, slip_rate)
+            svg_no, svg_od = tv.add_step(s_idx2, decision, info)
             self.tree_html.value = f"<div style='display: flex; flex-direction: column; gap: 20px; align-items: center;'>{svg_no}{svg_od}</div>"
         except Exception as e:
-            self.tree_html.value = f"<b style='color:red;'>Graphviz error: {e}</b><br>Make sure 'graphviz' is installed."
+            import traceback
+            err = traceback.format_exc()
+            self.tree_html.value = f"<b style='color:red;'>Graphviz error: {e}<br><pre>{err}</pre></b><br>Make sure 'graphviz' is installed."
         
     def show_with_tree(self):
         if not self.traj_base and not self.traj_od:
