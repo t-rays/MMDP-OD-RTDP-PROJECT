@@ -50,11 +50,24 @@ def _generate_bellman_html(mdp, planner, state, action):
     return html
 
 class TrajectoryVisualizer:
-    def __init__(self, mdp: GridMMDP, planner, max_steps: int = 50, seed: int = 42):
+    def __init__(self, mdp: GridMMDP, planner, max_steps: int = 50, seed: int = 42, show_trails: bool = True, show_heatmap: bool = False, heatmap_agent: int = 0):
         self.mdp = mdp
         self.planner = planner
         self.max_steps = max_steps
+        self.show_trails = show_trails
+        self.show_heatmap = show_heatmap
+        self.heatmap_agent = heatmap_agent
         
+        self.heatmap_data = None
+        if self.show_heatmap and hasattr(self.planner, 'heuristic') and self.planner.heuristic is not None:
+            import numpy as np
+            grid = self.mdp.instance.grid_map
+            self.heatmap_data = np.full((grid.height, grid.width), np.nan)
+            if 0 <= self.heatmap_agent < self.mdp.n_agents:
+                dist_table = self.planner.heuristic.distance_tables[self.heatmap_agent]
+                for (x, y), dist in dist_table.items():
+                    self.heatmap_data[y, x] = dist
+                    
         # Generate the trajectory manually
         self.trajectory = []
         self.actions = []
@@ -106,6 +119,12 @@ class TrajectoryVisualizer:
         cmap = mcolors.ListedColormap(['white', '#2d3436'])
         ax.imshow(grid_matrix, cmap=cmap, extent=[-0.5, grid.width-0.5, grid.height-0.5, -0.5], origin='upper', interpolation='nearest')
             
+        if getattr(self, 'show_heatmap', False) and getattr(self, 'heatmap_data', None) is not None:
+            import copy
+            hm_cmap = copy.copy(plt.get_cmap('Blues_r'))
+            hm_cmap.set_bad(alpha=0.0)
+            ax.imshow(self.heatmap_data, cmap=hm_cmap, extent=[-0.5, grid.width-0.5, grid.height-0.5, -0.5], origin='upper', interpolation='nearest', alpha=0.5)
+
         # Draw goals
         for i, (gx, gy) in enumerate(self.mdp.instance.goals):
             color = self.colors[i % len(self.colors)]
@@ -133,6 +152,15 @@ class TrajectoryVisualizer:
             
         state = self.trajectory[step]
         
+        # Draw trails if enabled
+        if getattr(self, 'show_trails', True) and step > 0:
+            for i in range(self.mdp.n_agents):
+                history = [s[i] for s in self.trajectory[:step+1]]
+                color = self.colors[i % len(self.colors)]
+                for j in range(1, len(history)):
+                    alpha = 0.1 + 0.7 * (j / len(history))
+                    self.ax.plot([history[j-1][0], history[j][0]], [history[j-1][1], history[j][1]], color=color, alpha=alpha, linewidth=3)
+                    
         # Draw agents
         for i, pos in enumerate(state):
             if pos != self.mdp.instance.goals[i]: # If not at goal
@@ -206,10 +234,23 @@ class TrajectoryVisualizer:
 
 
 class DualTrajectoryVisualizer:
-    def __init__(self, mdp, baseline_planner, od_planner, max_steps=100, seed=42):
+    def __init__(self, mdp, baseline_planner, od_planner, max_steps=100, seed=42, show_trails=True, show_heatmap=False, heatmap_agent=0):
         self.mdp = mdp
         self.max_steps_limit = max_steps
+        self.show_trails = show_trails
+        self.show_heatmap = show_heatmap
+        self.heatmap_agent = heatmap_agent
         
+        self.heatmap_data = None
+        if self.show_heatmap and hasattr(baseline_planner, 'heuristic') and baseline_planner.heuristic is not None:
+            import numpy as np
+            grid = self.mdp.instance.grid_map
+            self.heatmap_data = np.full((grid.height, grid.width), np.nan)
+            if 0 <= self.heatmap_agent < self.mdp.n_agents:
+                dist_table = baseline_planner.heuristic.distance_tables[self.heatmap_agent]
+                for (x, y), dist in dist_table.items():
+                    self.heatmap_data[y, x] = dist
+                    
         # Run Baseline
         self.traj_base, self.actions_base, self.success_base = self._simulate(baseline_planner, seed)
         # Run OD
@@ -267,6 +308,12 @@ class DualTrajectoryVisualizer:
         cmap = mcolors.ListedColormap(['white', '#2d3436'])
         ax.imshow(grid_matrix, cmap=cmap, extent=[-0.5, grid.width-0.5, grid.height-0.5, -0.5], origin='upper', interpolation='nearest')
         
+        if getattr(self, 'show_heatmap', False) and getattr(self, 'heatmap_data', None) is not None:
+            import copy
+            hm_cmap = copy.copy(plt.get_cmap('Blues_r'))
+            hm_cmap.set_bad(alpha=0.0)
+            ax.imshow(self.heatmap_data, cmap=hm_cmap, extent=[-0.5, grid.width-0.5, grid.height-0.5, -0.5], origin='upper', interpolation='nearest', alpha=0.5)
+
         ax.set_xlim(-0.5, grid.width - 0.5)
         ax.set_ylim(grid.height - 0.5, -0.5)
         ax.set_aspect('equal')
@@ -294,6 +341,15 @@ class DualTrajectoryVisualizer:
         
         # Baseline
         s_idx1 = min(step, len(self.traj_base)-1)
+        
+        if getattr(self, 'show_trails', True) and s_idx1 > 0:
+            for i in range(self.mdp.n_agents):
+                history = [s[i] for s in self.traj_base[:s_idx1+1]]
+                color = self.colors[i % len(self.colors)]
+                for j in range(1, len(history)):
+                    alpha = 0.1 + 0.7 * (j / len(history))
+                    self.ax1.plot([history[j-1][0], history[j][0]], [history[j-1][1], history[j][1]], color=color, alpha=alpha, linewidth=3)
+                    
         state1 = self.traj_base[s_idx1]
         act1 = self.actions_base[s_idx1] if s_idx1 < len(self.actions_base) else None
         for i, pos in enumerate(state1):
@@ -310,6 +366,15 @@ class DualTrajectoryVisualizer:
         
         # OD
         s_idx2 = min(step, len(self.traj_od)-1)
+        
+        if getattr(self, 'show_trails', True) and s_idx2 > 0:
+            for i in range(self.mdp.n_agents):
+                history = [s[i] for s in self.traj_od[:s_idx2+1]]
+                color = self.colors[i % len(self.colors)]
+                for j in range(1, len(history)):
+                    alpha = 0.1 + 0.7 * (j / len(history))
+                    self.ax2.plot([history[j-1][0], history[j][0]], [history[j-1][1], history[j][1]], color=color, alpha=alpha, linewidth=3)
+                    
         state2 = self.traj_od[s_idx2]
         act2 = self.actions_od[s_idx2] if s_idx2 < len(self.actions_od) else None
         for i, pos in enumerate(state2):
