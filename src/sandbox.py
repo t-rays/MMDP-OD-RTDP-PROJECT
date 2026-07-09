@@ -10,7 +10,7 @@ from od_rtdp import OperatorDecompositionRTDP
 from baseline_rtdp import BaselineRTDP, RTDPConfig
 from evaluation import evaluate_policy, EvaluationConfig
 from resource_monitor import ResourceMonitor
-from visualizer import TrajectoryVisualizer
+from visualizer import TrajectoryVisualizer, DualTrajectoryVisualizer
 
 class InteractiveSandbox:
     def __init__(self, initial_grid_size: int = 8, max_agents: int = 4):
@@ -279,10 +279,13 @@ class InteractiveSandbox:
                     </div>
                     """
                     display(widgets.HTML(summary_html))
-                
-                # Visualize the trajectory using the active planner
-                viz = TrajectoryVisualizer(mdp, active_planner, max_steps=100)
-                viz.show_with_tree()
+                    
+                    viz = DualTrajectoryVisualizer(mdp, baseline_planner, od_planner, max_steps=100)
+                    viz.show_with_tree()
+                else:
+                    # Visualize the trajectory using the active planner
+                    viz = TrajectoryVisualizer(mdp, active_planner, max_steps=100)
+                    viz.show_with_tree()
         except Exception as e:
             self.status_label.value = f"Error: {str(e)}"
             with self.output_area:
