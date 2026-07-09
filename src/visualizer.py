@@ -13,6 +13,7 @@ class TrajectoryVisualizer:
         
         # Generate the trajectory manually
         self.trajectory = []
+        self.actions = []
         state = self.mdp.initial_state()
         self.trajectory.append(state)
         
@@ -24,6 +25,7 @@ class TrajectoryVisualizer:
         while step_count < self.max_steps and not self.mdp.is_terminal(state):
             # Select action
             action = self.planner.policy_action(state, tie_rng=rng)
+            self.actions.append(action)
             # Step environment
             state = self.mdp.sample_next(state, action, rng)
             self.trajectory.append(state)
@@ -36,6 +38,7 @@ class TrajectoryVisualizer:
         self.max_steps = len(self.trajectory) - 1
         self.fig, self.ax = None, None
         self.colors = ['#ff7675', '#74b9ff', '#00b894', '#e17055', '#0984e3', '#b2bec3']
+        self.tree_html = widgets.HTML(value="")
         
     def draw_grid(self, ax):
         grid = self.mdp.instance.grid_map
@@ -59,7 +62,7 @@ class TrajectoryVisualizer:
             
     def render_step(self, step: int):
         if not self.fig:
-            self.fig, self.ax = plt.subplots(figsize=(6, 6))
+            self.fig, self.ax = plt.subplots(figsize=(5, 5))
             
         self.draw_grid(self.ax)
         
@@ -84,6 +87,16 @@ class TrajectoryVisualizer:
         self.ax.set_title(f"Step {step} / {self.max_steps} | Status: {status_text}")
         self.fig.canvas.draw()
         
+        # Update SVG trees
+        from tree_visualizer import BranchingTreeVisualizer
+        try:
+            # If we are at the very last step, there is no "next" action, so show the previous action or None
+            act = self.actions[step] if step < len(self.actions) else None
+            svg_no, svg_od = BranchingTreeVisualizer.generate_trees_svg(self.mdp.n_agents, step, act)
+            self.tree_html.value = f"<div style='display: flex; flex-direction: column; gap: 20px; align-items: center;'>{svg_no}{svg_od}</div>"
+        except Exception as e:
+            self.tree_html.value = f"<b style='color:red;'>Graphviz error: {e}</b><br>Make sure 'graphviz' is installed."
+        
     def show_with_tree(self):
         if not self.trajectory:
             print("No trajectory found to visualize.")
@@ -93,7 +106,6 @@ class TrajectoryVisualizer:
         grid_output = widgets.Output()
         
         with grid_output:
-            self.fig, self.ax = plt.subplots(figsize=(5, 5))
             self.render_step(0)
             plt.show()
             
@@ -111,15 +123,7 @@ class TrajectoryVisualizer:
         controls = widgets.HBox([play, slider])
         
         left_side = widgets.VBox([grid_output, controls])
-        
-        # 2. Graphviz Trees
-        from tree_visualizer import BranchingTreeVisualizer
-        try:
-            svg_no, svg_od = BranchingTreeVisualizer.generate_trees_svg(self.mdp.n_agents)
-            tree_html = widgets.HTML(value=f"<div style='display: flex; flex-direction: column; gap: 20px; align-items: center;'>{svg_no}{svg_od}</div>")
-        except Exception as e:
-            tree_html = widgets.HTML(value=f"<b style='color:red;'>Graphviz error: {e}</b><br>Make sure 'graphviz' is installed.")
             
-        # 3. Combine Side-by-Side
-        main_layout = widgets.HBox([left_side, tree_html], layout=widgets.Layout(align_items='center', justify_content='space-around'))
+        # Combine Side-by-Side
+        main_layout = widgets.HBox([left_side, self.tree_html], layout=widgets.Layout(align_items='center', justify_content='space-around'))
         display(main_layout)
