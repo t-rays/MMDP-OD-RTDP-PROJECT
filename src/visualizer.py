@@ -50,13 +50,15 @@ def _generate_bellman_html(mdp, planner, state, action):
     return html
 
 class TrajectoryVisualizer:
-    def __init__(self, mdp: GridMMDP, planner, max_steps: int = 50, seed: int = 42, show_trails: bool = True, show_heatmap: bool = False, heatmap_agent: int = 0):
+    def __init__(self, mdp: GridMMDP, planner, max_steps: int = 50, seed: int = 42, show_trails: bool = True, show_heatmap: bool = False, heatmap_agent: int = 0, dynamic_projection: bool = False):
         self.mdp = mdp
         self.planner = planner
         self.max_steps = max_steps
         self.show_trails = show_trails
         self.show_heatmap = show_heatmap
         self.heatmap_agent = heatmap_agent
+        self.dynamic_projection = dynamic_projection
+        self.ax_heatmap = None
         
         self.heatmap_data = None
         if self.show_heatmap and hasattr(self.planner, 'heuristic') and self.planner.heuristic is not None:
@@ -137,10 +139,14 @@ class TrajectoryVisualizer:
             height = self.mdp.instance.grid_map.height
             aspect_ratio = width / height
             
-            fig_width = min(15.0, max(5.0, width * 0.2))
-            fig_height = fig_width / aspect_ratio
-            
-            self.fig, self.ax = plt.subplots(figsize=(fig_width, fig_height))
+            if getattr(self, 'dynamic_projection', False):
+                base_fig_width = min(9.0, max(4.0, width * 0.15))
+                fig_height = base_fig_width / aspect_ratio
+                self.fig, (self.ax, self.ax_heatmap) = plt.subplots(1, 2, figsize=(base_fig_width * 2, fig_height))
+            else:
+                fig_width = min(15.0, max(5.0, width * 0.2))
+                fig_height = fig_width / aspect_ratio
+                self.fig, self.ax = plt.subplots(figsize=(fig_width, fig_height))
             
         self.draw_grid(self.ax)
         
@@ -172,6 +178,42 @@ class TrajectoryVisualizer:
                 
         status_text = "Success" if self.success and step == self.max_steps else "Running"
         self.ax.set_title(f"Step {step} / {self.max_steps} | Status: {status_text}")
+        
+        if getattr(self, 'dynamic_projection', False) and self.ax_heatmap:
+            self.draw_grid(self.ax_heatmap)
+            self.ax_heatmap.set_title(f"Dynamic Projection (Agent {self.heatmap_agent})")
+            
+            import numpy as np
+            import copy
+            
+            grid = self.mdp.instance.grid_map
+            dyn_heatmap = np.full((grid.height, grid.width), np.nan)
+            
+            if 0 <= self.heatmap_agent < self.mdp.n_agents:
+                for x in range(grid.width):
+                    for y in range(grid.height):
+                        if (x, y) not in grid.obstacles:
+                            s_list = list(state)
+                            s_list[self.heatmap_agent] = (x, y)
+                            s_prime = tuple(s_list)
+                            
+                            val = self.planner.real_state_value(s_prime) if hasattr(self.planner, 'real_state_value') else self.planner.value(s_prime)
+                            dyn_heatmap[y, x] = val
+                            
+            hm_cmap = copy.copy(plt.get_cmap('magma'))
+            hm_cmap.set_bad(color='#2d3436')
+            
+            self.ax_heatmap.imshow(dyn_heatmap, cmap=hm_cmap, extent=[-0.5, grid.width-0.5, grid.height-0.5, -0.5], origin='upper', interpolation='nearest', alpha=0.85)
+            
+            for i, pos in enumerate(state):
+                color = self.colors[i % len(self.colors)]
+                if i == self.heatmap_agent:
+                    self.ax_heatmap.add_patch(Circle((pos[0], pos[1]), 0.4, facecolor='white', alpha=0.7, linestyle='--'))
+                    self.ax_heatmap.text(pos[0], pos[1], str(i), ha='center', va='center', color='black')
+                else:
+                    self.ax_heatmap.add_patch(Circle((pos[0], pos[1]), 0.4, facecolor=color))
+                    self.ax_heatmap.text(pos[0], pos[1], str(i), ha='center', va='center', color='white', fontweight='bold')
+
         self.fig.canvas.draw()
         
         # Update SVG trees
