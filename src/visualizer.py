@@ -107,14 +107,18 @@ class TrajectoryVisualizer:
         
         with grid_output:
             self.render_step(0)
-            plt.show()
+            display(self.fig)
+            plt.close(self.fig) # Prevent duplicate inline plotting
             
         slider = widgets.IntSlider(min=0, max=self.max_steps, step=1, value=0, description='Step:')
         
         def on_change(change):
             if change['name'] == 'value':
                 with grid_output:
+                    from IPython.display import clear_output
+                    clear_output(wait=True)
                     self.render_step(change['new'])
+                    display(self.fig)
                     
         slider.observe(on_change)
         
