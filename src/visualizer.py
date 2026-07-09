@@ -124,9 +124,9 @@ class TrajectoryVisualizer:
         
         play = widgets.Play(min=0, max=self.max_steps, step=1, interval=400, description="Press play")
         widgets.jslink((play, 'value'), (slider, 'value'))
-        controls = widgets.HBox([play, slider])
+        controls = widgets.HBox([play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
         
-        left_side = widgets.VBox([grid_output, controls])
+        left_side = widgets.VBox([grid_output, controls], layout=widgets.Layout(align_items='center'))
             
         # Combine Side-by-Side
         main_layout = widgets.HBox([left_side, self.tree_html], layout=widgets.Layout(align_items='center', justify_content='space-around'))
