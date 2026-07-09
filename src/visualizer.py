@@ -126,11 +126,12 @@ class TrajectoryVisualizer:
         widgets.jslink((play, 'value'), (slider, 'value'))
         
         # Inject CSS to fix missing FontAwesome icons in VSCode Jupyter
+        # We use \FE0E (Variation Selector-15) to force text-rendering instead of Windows emojis
         icon_fix_css = widgets.HTML("""
         <style>
-        .widget-play .fa-play:before { content: "▶" !important; font-family: "Segoe UI Emoji", sans-serif !important; font-size: 14px; }
-        .widget-play .fa-pause:before { content: "⏸" !important; font-family: "Segoe UI Emoji", sans-serif !important; font-size: 14px; }
-        .widget-play .fa-stop:before { content: "⏹" !important; font-family: "Segoe UI Emoji", sans-serif !important; font-size: 14px; }
+        .widget-play .fa-play:before { content: "\\25b6\\fe0e" !important; font-family: Arial, sans-serif !important; font-size: 16px !important; color: #444 !important; }
+        .widget-play .fa-pause:before { content: "\\23f8\\fe0e" !important; font-family: Arial, sans-serif !important; font-size: 16px !important; color: #444 !important; }
+        .widget-play .fa-stop:before { content: "\\23f9\\fe0e" !important; font-family: Arial, sans-serif !important; font-size: 16px !important; color: #444 !important; }
         </style>
         """)
         
