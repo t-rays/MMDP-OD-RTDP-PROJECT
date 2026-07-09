@@ -854,13 +854,11 @@ class BaselineRTDP:
                 ):
                     stop_reason = "stable_trials"
                     break
-                
-                try:
-                    self._check_deadline(deadline)
-                except _DeadlineReached:
+                    
+                if deadline is not None and time.perf_counter() >= deadline:
                     stop_reason = "time_limit"
                     break
-                except _MemoryLimitReached:
+                if monitor.limit_reached():
                     stop_reason = "memory_limit"
                     break
         finally:

@@ -853,7 +853,13 @@ class OperatorDecompositionRTDP:
                 ):
                     stop_reason = "stable_trials"
                     break
-                self._check_deadline(deadline)
+                    
+                if deadline is not None and time.perf_counter() >= deadline:
+                    stop_reason = "time_limit"
+                    break
+                if monitor.limit_reached():
+                    stop_reason = "memory_limit"
+                    break
         finally:
             snapshot = monitor.stop()
             self._resource_monitor = None
