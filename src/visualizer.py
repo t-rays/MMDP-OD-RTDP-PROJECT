@@ -84,26 +84,42 @@ class TrajectoryVisualizer:
         self.ax.set_title(f"Step {step} / {self.max_steps} | Status: {status_text}")
         self.fig.canvas.draw()
         
-    def show(self):
+    def show_with_tree(self):
         if not self.trajectory:
             print("No trajectory found to visualize.")
             return
             
-        self.fig, self.ax = plt.subplots(figsize=(6, 6))
+        # 1. Grid Visualizer Output
+        grid_output = widgets.Output()
         
+        with grid_output:
+            self.fig, self.ax = plt.subplots(figsize=(5, 5))
+            self.render_step(0)
+            plt.show()
+            
         slider = widgets.IntSlider(min=0, max=self.max_steps, step=1, value=0, description='Step:')
         
         def on_change(change):
             if change['name'] == 'value':
-                self.render_step(change['new'])
-                
+                with grid_output:
+                    self.render_step(change['new'])
+                    
         slider.observe(on_change)
-        self.render_step(0)
         
-        # Controls
         play = widgets.Play(min=0, max=self.max_steps, step=1, interval=400, description="Press play")
         widgets.jslink((play, 'value'), (slider, 'value'))
-        
         controls = widgets.HBox([play, slider])
-        display(controls)
-        plt.show()
+        
+        left_side = widgets.VBox([grid_output, controls])
+        
+        # 2. Graphviz Trees
+        from tree_visualizer import BranchingTreeVisualizer
+        try:
+            svg_no, svg_od = BranchingTreeVisualizer.generate_trees_svg(self.mdp.n_agents)
+            tree_html = widgets.HTML(value=f"<div style='display: flex; flex-direction: column; gap: 20px; align-items: center;'>{svg_no}{svg_od}</div>")
+        except Exception as e:
+            tree_html = widgets.HTML(value=f"<b style='color:red;'>Graphviz error: {e}</b><br>Make sure 'graphviz' is installed.")
+            
+        # 3. Combine Side-by-Side
+        main_layout = widgets.HBox([left_side, tree_html], layout=widgets.Layout(align_items='center', justify_content='space-around'))
+        display(main_layout)
