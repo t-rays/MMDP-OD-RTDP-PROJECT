@@ -123,30 +123,18 @@ class TrajectoryVisualizer:
         slider.observe(on_change)
         
         play = widgets.Play(min=0, max=self.max_steps, step=1, interval=400, show_repeat=False)
-        play.layout.display = 'none' # Hide the broken FontAwesome widget
         widgets.jslink((play, 'value'), (slider, 'value'))
         
-        play_btn = widgets.ToggleButton(description='▶ Play', value=False, button_style='success')
+        # Inject CSS to fix missing FontAwesome icons in VSCode Jupyter
+        icon_fix_css = widgets.HTML("""
+        <style>
+        .widget-play .fa-play:before { content: "▶" !important; font-family: "Segoe UI Emoji", sans-serif !important; font-size: 14px; }
+        .widget-play .fa-pause:before { content: "⏸" !important; font-family: "Segoe UI Emoji", sans-serif !important; font-size: 14px; }
+        .widget-play .fa-stop:before { content: "⏹" !important; font-family: "Segoe UI Emoji", sans-serif !important; font-size: 14px; }
+        </style>
+        """)
         
-        # Pure Javascript link between our custom ToggleButton and the hidden JS-backed Play loop
-        try:
-            widgets.jslink((play_btn, 'value'), (play, 'playing'))
-        except Exception:
-            widgets.jslink((play_btn, 'value'), (play, '_playing'))
-            
-        def update_play_btn(change):
-            if change['new']:
-                play_btn.description = '⏸ Pause'
-                play_btn.button_style = 'warning'
-                if slider.value == self.max_steps:
-                    slider.value = 0
-            else:
-                play_btn.description = '▶ Play'
-                play_btn.button_style = 'success'
-                
-        play_btn.observe(update_play_btn, 'value')
-        
-        controls = widgets.HBox([play_btn, play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
+        controls = widgets.HBox([icon_fix_css, play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
         
         left_side = widgets.VBox([grid_output, controls], layout=widgets.Layout(align_items='center'))
             
