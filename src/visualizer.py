@@ -53,7 +53,7 @@ def _generate_bellman_html(mdp, planner, state, action):
 def _build_tree_decision_context(mdp, planner, state, chosen_action, next_state=None):
     decision = {}
     info = {}
-    ACTIONS = ['N', 'S', 'E', 'W', 'stay']
+    ACTIONS = ['up', 'down', 'right', 'left', 'stay']
     
     # 1. Joint Scores
     scores = []
@@ -97,7 +97,7 @@ def _build_tree_decision_context(mdp, planner, state, chosen_action, next_state=
                 prefix = prefix + (chosen_action[i],)
                 curr_pos = state[i]
                 # Fallback vectors
-                vectors = {'N': (0, -1), 'S': (0, 1), 'E': (1, 0), 'W': (-1, 0), 'stay': (0, 0)}
+                vectors = {'up': (0, -1), 'down': (0, 1), 'right': (1, 0), 'left': (-1, 0), 'stay': (0, 0)}
                 dx, dy = vectors[chosen_action[i]]
                 reserved_targets.append(f"({curr_pos[0]+dx}, {curr_pos[1]+dy})")
     
@@ -108,7 +108,7 @@ def _build_tree_decision_context(mdp, planner, state, chosen_action, next_state=
     executed = []
     slipped = []
     if next_state and chosen_action:
-        vectors = {'N': (0, -1), 'S': (0, 1), 'E': (1, 0), 'W': (-1, 0), 'stay': (0, 0)}
+        vectors = {'up': (0, -1), 'down': (0, 1), 'right': (1, 0), 'left': (-1, 0), 'stay': (0, 0)}
         for i in range(mdp.n_agents):
             curr_pos = state[i]
             dx, dy = vectors[chosen_action[i]]

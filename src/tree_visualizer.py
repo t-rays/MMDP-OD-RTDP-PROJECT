@@ -1,7 +1,7 @@
 import graphviz
 from typing import Optional, Tuple, Dict, Any
 
-ACTIONS = ['N', 'S', 'E', 'W', 'stay']
+ACTIONS = ['up', 'down', 'right', 'left', 'stay']
 COLORS = {
     'chosen': '#0984e3',
     'joint_best': '#e17055',
