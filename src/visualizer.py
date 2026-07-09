@@ -4,25 +4,36 @@ import ipywidgets as widgets
 from IPython.display import display
 from typing import Optional, List, Tuple
 from grid_mmdp import GridMMDP
-from evaluation import EvaluationResult
 
 class TrajectoryVisualizer:
-    def __init__(self, mdp: GridMMDP, evaluation_result: EvaluationResult):
+    def __init__(self, mdp: GridMMDP, planner, max_steps: int = 50, seed: int = 42):
         self.mdp = mdp
-        self.result = evaluation_result
+        self.planner = planner
+        self.max_steps = max_steps
         
-        # Find the first successful episode, or fallback to the first episode
-        self.episode = None
-        for ep in self.result.episode_results:
-            if ep.success:
-                self.episode = ep
-                break
-        if not self.episode and self.result.episode_results:
-            self.episode = self.result.episode_results[0]
+        # Generate the trajectory manually
+        self.trajectory = []
+        state = self.mdp.initial_state()
+        self.trajectory.append(state)
+        
+        import random
+        rng = random.Random(seed)
+        
+        step_count = 0
+        self.success = False
+        while step_count < self.max_steps and not self.mdp.is_terminal(state):
+            # Select action
+            action = self.planner.policy_action(state, tie_rng=rng)
+            # Step environment
+            state = self.mdp.step(state, action, rng)
+            self.trajectory.append(state)
+            step_count += 1
             
-        self.trajectory = self.episode.trajectory if self.episode else []
-        self.max_steps = len(self.trajectory) - 1 if self.trajectory else 0
-        
+            if self.mdp.is_terminal(state):
+                self.success = True
+                break
+                
+        self.max_steps = len(self.trajectory) - 1
         self.fig, self.ax = None, None
         self.colors = ['#ff7675', '#74b9ff', '#00b894', '#e17055', '#0984e3', '#b2bec3']
         
@@ -58,7 +69,7 @@ class TrajectoryVisualizer:
             self.fig.canvas.draw()
             return
             
-        state = self.trajectory[step].state
+        state = self.trajectory[step]
         
         # Draw agents
         for i, pos in enumerate(state.agent_positions):
@@ -69,7 +80,8 @@ class TrajectoryVisualizer:
             else:
                 self.ax.add_patch(Circle((pos[0], pos[1]), 0.4, facecolor='#00b894', alpha=0.8)) # Finished
                 
-        self.ax.set_title(f"Step {step} / {self.max_steps} | Success: {self.episode.success}")
+        status_text = "Success" if self.success and step == self.max_steps else "Running"
+        self.ax.set_title(f"Step {step} / {self.max_steps} | Status: {status_text}")
         self.fig.canvas.draw()
         
     def show(self):
