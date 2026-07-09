@@ -7,7 +7,7 @@ from grid_mmdp import GridMMDP
 
 def _generate_bellman_html(mdp, planner, state, action):
     if action is None or mdp.is_terminal(state):
-        return "<div style='padding: 10px; color: #7f8c8d; font-style: italic;'>Terminal state reached. V(s) = 0.0</div>"
+        return "<div style='padding: 10px; color: #7f8c8d; font-style: italic; font-family: sans-serif;'>Terminal state reached. V(s) = 0.0</div>"
         
     def get_v(s):
         if hasattr(planner, 'real_state_value'):
@@ -22,28 +22,28 @@ def _generate_bellman_html(mdp, planner, state, action):
         cost = mdp.transition_cost(state, action, next_state)
         v_next = get_v(next_state)
         expected_q += prob * (cost + v_next)
-        terms.append(f"{prob:.2f} \\times [{cost:.1f} + {v_next:.2f}]")
+        terms.append(f"{prob:.2f} &times; [{cost:.1f} + {v_next:.2f}]")
         
     if len(terms) > 3:
         chunks = [" + ".join(terms[i:i+3]) for i in range(0, len(terms), 3)]
-        sum_str = " + \\\\ & ".join(chunks)
-        sum_str = f"\\begin{{aligned}} = & {sum_str} \\end{{aligned}}"
+        sum_str = " + <br>&nbsp;&nbsp;&nbsp;&nbsp;".join(chunks)
+        sum_str = f"= {sum_str}"
     else:
         sum_str = "= " + " + ".join(terms)
         
-    act_str = ",".join(action)
+    act_str = ", ".join(action)
     
     html = f"""
-    <div style="background-color: #fdfbf7; padding: 15px; border-radius: 8px; border: 1px solid #e1d8c1; margin-top: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-width: 400px; max-width: 650px;">
-        <h4 style="margin-top: 0; margin-bottom: 10px; color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px;">Live Bellman Equation</h4>
-        <div style="font-size: 1.1em; margin-bottom: 10px; color: #34495e;">
-            \\( Q(s, a) = \\sum_{{s'}} P(s'|s,a) \\left[ c(s,a,s') + V(s') \\right] \\)
+    <div style="background-color: #fdfbf7; padding: 15px; border-radius: 8px; border: 1px solid #e1d8c1; margin-top: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-width: 400px; max-width: 650px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <h4 style="margin-top: 0; margin-bottom: 12px; color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 8px;">Live Bellman Equation</h4>
+        <div style="font-size: 1.1em; margin-bottom: 12px; color: #34495e; font-family: 'Consolas', 'Courier New', monospace;">
+            <i>Q(s, a)</i> = <b>&Sigma;</b> <i>P(s'|s,a)</i> [ <i>c(s,a,s')</i> + <i>V(s')</i> ]
         </div>
-        <div style="font-size: 1.0em; margin-bottom: 15px; color: #c0392b; overflow-x: auto;">
-            \\( {sum_str} \\)
+        <div style="font-size: 1.05em; margin-bottom: 15px; color: #c0392b; font-family: 'Consolas', 'Courier New', monospace; line-height: 1.5;">
+            {sum_str}
         </div>
-        <div style="font-size: 1.2em; font-weight: bold; color: #27ae60; border-top: 1px dashed #ccc; padding-top: 10px;">
-            \\( Q(s, \\text{{{act_str}}}) = {expected_q:.3f} \\)
+        <div style="font-size: 1.2em; font-weight: bold; color: #27ae60; border-top: 1px dashed #ccc; padding-top: 12px; font-family: 'Consolas', 'Courier New', monospace;">
+            <i>Q</i>(s, <span style="color: #2980b9;">[{act_str}]</span>) = {expected_q:.3f}
         </div>
     </div>
     """
@@ -83,7 +83,7 @@ class TrajectoryVisualizer:
         self.fig, self.ax = None, None
         self.colors = ['#ff7675', '#74b9ff', '#00b894', '#e17055', '#0984e3', '#b2bec3']
         self.tree_html = widgets.HTML(value="")
-        self.bellman_html = widgets.HTMLMath(value="")
+        self.bellman_html = widgets.HTML(value="")
         
     def draw_grid(self, ax):
         grid = self.mdp.instance.grid_map
@@ -219,8 +219,8 @@ class DualTrajectoryVisualizer:
         self.fig, (self.ax1, self.ax2) = None, (None, None)
         self.colors = ['#ff7675', '#74b9ff', '#00b894', '#e17055', '#0984e3', '#b2bec3']
         self.tree_html = widgets.HTML(value="")
-        self.bellman_base_html = widgets.HTMLMath(value="")
-        self.bellman_od_html = widgets.HTMLMath(value="")
+        self.bellman_base_html = widgets.HTML(value="")
+        self.bellman_od_html = widgets.HTML(value="")
         self.baseline_planner = baseline_planner
         self.od_planner = od_planner
         
