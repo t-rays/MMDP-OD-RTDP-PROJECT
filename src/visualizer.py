@@ -125,10 +125,10 @@ class TrajectoryVisualizer:
         self.playing = False
         play_btn = widgets.Button(description='▶ Play', button_style='success')
         
-        async def play_loop():
-            import asyncio
+        def play_loop():
+            import time
             while self.playing and slider.value < self.max_steps:
-                await asyncio.sleep(0.5)
+                time.sleep(0.5)
                 slider.value += 1
             self.playing = False
             play_btn.description = '▶ Play'
@@ -141,12 +141,10 @@ class TrajectoryVisualizer:
                 play_btn.button_style = 'warning'
                 if slider.value == self.max_steps:
                     slider.value = 0
-                import asyncio
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(play_loop())
-                except RuntimeError:
-                    asyncio.run(play_loop())
+                import threading
+                thread = threading.Thread(target=play_loop)
+                thread.daemon = True
+                thread.start()
             else:
                 self.playing = False
                 play_btn.description = '▶ Play'
