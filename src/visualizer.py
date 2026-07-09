@@ -25,7 +25,7 @@ class TrajectoryVisualizer:
             # Select action
             action = self.planner.policy_action(state, tie_rng=rng)
             # Step environment
-            state = self.mdp.step(state, action, rng)
+            state = self.mdp.sample_next(state, action, rng)
             self.trajectory.append(state)
             step_count += 1
             
