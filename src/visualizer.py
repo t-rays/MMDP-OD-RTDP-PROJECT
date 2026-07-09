@@ -366,7 +366,7 @@ class TrajectoryVisualizer:
         </style>
         """)
         
-                zoom_slider = widgets.FloatSlider(value=1.0, min=0.1, max=3.0, step=0.1, description='Tree Zoom:')
+        zoom_slider = widgets.FloatSlider(value=1.0, min=0.1, max=3.0, step=0.1, description='Tree Zoom:')
         def on_zoom(change):
             self.tree_zoom = change['new']
             self.update_tree_html()
@@ -597,7 +597,7 @@ class DualTrajectoryVisualizer:
         </style>
         """)
         
-                zoom_slider = widgets.FloatSlider(value=1.0, min=0.1, max=3.0, step=0.1, description='Tree Zoom:')
+        zoom_slider = widgets.FloatSlider(value=1.0, min=0.1, max=3.0, step=0.1, description='Tree Zoom:')
         def on_zoom(change):
             self.tree_zoom = change['new']
             self.update_tree_html()
