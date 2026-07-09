@@ -42,12 +42,19 @@ class InteractiveSandbox:
         self.agent_slider = widgets.IntSlider(min=1, max=self.max_agents, value=self.num_agents, description="Agents:")
         self.agent_slider.observe(self._on_agents_changed, names='value')
         
-        self.run_button = widgets.Button(description="Run OD-RTDP", button_style="success", icon="play")
+        self.run_button = widgets.Button(description="Run Planner", button_style="success", icon="play")
         self.run_button.on_click(self._on_run_clicked)
+        
+        self.mode_dropdown = widgets.Dropdown(
+            options=['OD-RTDP', 'Baseline RTDP', 'Compare Performance'],
+            value='OD-RTDP',
+            description='Mode:',
+            layout=widgets.Layout(width='250px')
+        )
         
         self.status_label = widgets.Label(value="Status: Ready")
         
-        controls = widgets.HBox([self.agent_slider, self.run_button, self.status_label])
+        controls = widgets.HBox([self.agent_slider, self.mode_dropdown, self.run_button, self.status_label])
         
         # Palette
         self.palette = widgets.ToggleButtons(
@@ -218,57 +225,63 @@ class InteractiveSandbox:
         eval_config = EvaluationConfig(episodes=20, seed=101) # Reduced episodes for quick sandbox feedback
         
         try:
-            self.status_label.value = "Status: Running Baseline RTDP..."
-            baseline_planner = BaselineRTDP(mdp, heuristic, config)
-            with ResourceMonitor() as monitor:
-                baseline_result = baseline_planner.solve()
-            baseline_mem = monitor.snapshot().peak_rss_delta_mb
-            baseline_eval = evaluate_policy(mdp, baseline_planner, eval_config)
+            mode = self.mode_dropdown.value
+            active_planner = None
             
-            self.status_label.value = "Status: Running OD RTDP..."
-            od_planner = OperatorDecompositionRTDP(mdp, heuristic, config)
-            with ResourceMonitor() as monitor:
-                od_result = od_planner.solve()
-            od_mem = monitor.snapshot().peak_rss_delta_mb
-            od_eval = evaluate_policy(mdp, od_planner, eval_config)
-            
+            if mode == 'Baseline RTDP' or mode == 'Compare Performance':
+                self.status_label.value = "Status: Running Baseline RTDP..."
+                baseline_planner = BaselineRTDP(mdp, heuristic, config)
+                with ResourceMonitor() as monitor:
+                    baseline_result = baseline_planner.solve()
+                baseline_mem = monitor.snapshot().peak_rss_delta_mb
+                baseline_eval = evaluate_policy(mdp, baseline_planner, eval_config)
+                active_planner = baseline_planner
+                
+            if mode == 'OD-RTDP' or mode == 'Compare Performance':
+                self.status_label.value = "Status: Running OD RTDP..."
+                od_planner = OperatorDecompositionRTDP(mdp, heuristic, config)
+                with ResourceMonitor() as monitor:
+                    od_result = od_planner.solve()
+                od_mem = monitor.snapshot().peak_rss_delta_mb
+                od_eval = evaluate_policy(mdp, od_planner, eval_config)
+                active_planner = od_planner
+                
             self.status_label.value = "Status: Solved!"
             
             with self.output_area:
                 self.output_area.clear_output()
                 
-                # Render the comparison summary
-                import ipywidgets as widgets
+                if mode == 'Compare Performance':
+                    import ipywidgets as widgets
+                    summary_html = f"""
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+                        <h3 style="margin-top: 0; color: #2c3e50;">Performance Comparison</h3>
+                        <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                            <tr style="border-bottom: 2px solid #bdc3c7;">
+                                <th style="padding: 8px;">Algorithm</th>
+                                <th style="padding: 8px;">Success Rate</th>
+                                <th style="padding: 8px;">Bellman Backups</th>
+                                <th style="padding: 8px;">Peak RAM</th>
+                            </tr>
+                            <tr style="border-bottom: 1px solid #ecf0f1;">
+                                <td style="padding: 8px; font-weight: bold; color: #e74c3c;">Baseline (Joint)</td>
+                                <td style="padding: 8px;">{baseline_eval.summary.success_rate*100:.1f}%</td>
+                                <td style="padding: 8px;">{baseline_result.bellman_backups:,}</td>
+                                <td style="padding: 8px;">{baseline_mem:.1f} MB</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; font-weight: bold; color: #2ecc71;">Operator Decomposition</td>
+                                <td style="padding: 8px;">{od_eval.summary.success_rate*100:.1f}%</td>
+                                <td style="padding: 8px;">{od_result.bellman_backups:,}</td>
+                                <td style="padding: 8px;">{od_mem:.1f} MB</td>
+                            </tr>
+                        </table>
+                    </div>
+                    """
+                    display(widgets.HTML(summary_html))
                 
-                summary_html = f"""
-                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
-                    <h3 style="margin-top: 0; color: #2c3e50;">Performance Comparison</h3>
-                    <table style="width: 100%; text-align: left; border-collapse: collapse;">
-                        <tr style="border-bottom: 2px solid #bdc3c7;">
-                            <th style="padding: 8px;">Algorithm</th>
-                            <th style="padding: 8px;">Success Rate</th>
-                            <th style="padding: 8px;">Bellman Backups</th>
-                            <th style="padding: 8px;">Peak RAM</th>
-                        </tr>
-                        <tr style="border-bottom: 1px solid #ecf0f1;">
-                            <td style="padding: 8px; font-weight: bold; color: #e74c3c;">Baseline (Joint)</td>
-                            <td style="padding: 8px;">{baseline_eval.summary.success_rate*100:.1f}%</td>
-                            <td style="padding: 8px;">{baseline_result.bellman_backups:,}</td>
-                            <td style="padding: 8px;">{baseline_mem:.1f} MB</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; font-weight: bold; color: #2ecc71;">Operator Decomposition</td>
-                            <td style="padding: 8px;">{od_eval.summary.success_rate*100:.1f}%</td>
-                            <td style="padding: 8px;">{od_result.bellman_backups:,}</td>
-                            <td style="padding: 8px;">{od_mem:.1f} MB</td>
-                        </tr>
-                    </table>
-                </div>
-                """
-                display(widgets.HTML(summary_html))
-                
-                # Visualize the trajectory using the OD planner
-                viz = TrajectoryVisualizer(mdp, od_planner, max_steps=100)
+                # Visualize the trajectory using the active planner
+                viz = TrajectoryVisualizer(mdp, active_planner, max_steps=100)
                 viz.show_with_tree()
         except Exception as e:
             self.status_label.value = f"Error: {str(e)}"
