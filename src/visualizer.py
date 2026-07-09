@@ -4,21 +4,21 @@ import ipywidgets as widgets
 from IPython.display import display
 from typing import Optional, List, Tuple
 from grid_mmdp import GridMMDP
-from evaluation import EvaluationSummary
+from evaluation import EvaluationResult
 
 class TrajectoryVisualizer:
-    def __init__(self, mdp: GridMMDP, evaluation_summary: EvaluationSummary):
+    def __init__(self, mdp: GridMMDP, evaluation_result: EvaluationResult):
         self.mdp = mdp
-        self.summary = evaluation_summary
+        self.result = evaluation_result
         
         # Find the first successful episode, or fallback to the first episode
         self.episode = None
-        for ep in self.summary.episodes:
+        for ep in self.result.episode_results:
             if ep.success:
                 self.episode = ep
                 break
-        if not self.episode and self.summary.episodes:
-            self.episode = self.summary.episodes[0]
+        if not self.episode and self.result.episode_results:
+            self.episode = self.result.episode_results[0]
             
         self.trajectory = self.episode.trajectory if self.episode else []
         self.max_steps = len(self.trajectory) - 1 if self.trajectory else 0
