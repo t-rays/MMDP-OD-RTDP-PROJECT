@@ -50,9 +50,16 @@ class TrajectoryVisualizer:
         ax.set_xticks([])
         ax.set_yticks([])
         
-        # Draw obstacles
+        # Build 2D array for the grid and use imshow for efficient, seamless rendering
+        import numpy as np
+        import matplotlib.colors as mcolors
+        
+        grid_matrix = np.zeros((grid.height, grid.width))
         for (x, y) in grid.obstacles:
-            ax.add_patch(Rectangle((x-0.5, y-0.5), 1, 1, facecolor='#2d3436'))
+            grid_matrix[y, x] = 1.0
+            
+        cmap = mcolors.ListedColormap(['white', '#2d3436'])
+        ax.imshow(grid_matrix, cmap=cmap, extent=[-0.5, grid.width-0.5, grid.height-0.5, -0.5], origin='upper', interpolation='nearest')
             
         # Draw goals
         for i, (gx, gy) in enumerate(self.mdp.instance.goals):
