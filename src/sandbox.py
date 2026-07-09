@@ -7,7 +7,9 @@ from grid_mmdp import GridMMDP, MMDPConfig
 from map_creator import GridMap, MapInstance, ScenarioEntry
 from heuristic import ShortestPathHeuristic
 from od_rtdp import OperatorDecompositionRTDP
-from baseline_rtdp import RTDPConfig
+from baseline_rtdp import BaselineRTDP, RTDPConfig
+from evaluation import evaluate_policy, EvaluationConfig
+from resource_monitor import ResourceMonitor
 from visualizer import TrajectoryVisualizer
 
 class InteractiveSandbox:
@@ -213,16 +215,60 @@ class InteractiveSandbox:
         mdp = GridMMDP(map_instance, MMDPConfig(slip_to_stay_probability=0.20))
         heuristic = ShortestPathHeuristic(mdp)
         config = RTDPConfig(time_limit_seconds=10.0, seed=42)
-        
-        planner = OperatorDecompositionRTDP(mdp, heuristic, config)
+        eval_config = EvaluationConfig(episodes=20, seed=101) # Reduced episodes for quick sandbox feedback
         
         try:
-            planner.solve()
+            self.status_label.value = "Status: Running Baseline RTDP..."
+            baseline_planner = BaselineRTDP(mdp, heuristic, config)
+            with ResourceMonitor() as monitor:
+                baseline_result = baseline_planner.solve()
+            baseline_mem = monitor.snapshot().peak_rss_delta_mb
+            baseline_eval = evaluate_policy(mdp, baseline_planner, eval_config)
+            
+            self.status_label.value = "Status: Running OD RTDP..."
+            od_planner = OperatorDecompositionRTDP(mdp, heuristic, config)
+            with ResourceMonitor() as monitor:
+                od_result = od_planner.solve()
+            od_mem = monitor.snapshot().peak_rss_delta_mb
+            od_eval = evaluate_policy(mdp, od_planner, eval_config)
+            
             self.status_label.value = "Status: Solved!"
             
             with self.output_area:
                 self.output_area.clear_output()
-                viz = TrajectoryVisualizer(mdp, planner, max_steps=100)
+                
+                # Render the comparison summary
+                import ipywidgets as widgets
+                
+                summary_html = f"""
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+                    <h3 style="margin-top: 0; color: #2c3e50;">Performance Comparison</h3>
+                    <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                        <tr style="border-bottom: 2px solid #bdc3c7;">
+                            <th style="padding: 8px;">Algorithm</th>
+                            <th style="padding: 8px;">Success Rate</th>
+                            <th style="padding: 8px;">Bellman Backups</th>
+                            <th style="padding: 8px;">Peak RAM</th>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #ecf0f1;">
+                            <td style="padding: 8px; font-weight: bold; color: #e74c3c;">Baseline (Joint)</td>
+                            <td style="padding: 8px;">{baseline_eval.summary.success_rate*100:.1f}%</td>
+                            <td style="padding: 8px;">{baseline_result.bellman_backups:,}</td>
+                            <td style="padding: 8px;">{baseline_mem:.1f} MB</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; font-weight: bold; color: #2ecc71;">Operator Decomposition</td>
+                            <td style="padding: 8px;">{od_eval.summary.success_rate*100:.1f}%</td>
+                            <td style="padding: 8px;">{od_result.bellman_backups:,}</td>
+                            <td style="padding: 8px;">{od_mem:.1f} MB</td>
+                        </tr>
+                    </table>
+                </div>
+                """
+                display(widgets.HTML(summary_html))
+                
+                # Visualize the trajectory using the OD planner
+                viz = TrajectoryVisualizer(mdp, od_planner, max_steps=100)
                 viz.show_with_tree()
         except Exception as e:
             self.status_label.value = f"Error: {str(e)}"
