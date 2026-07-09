@@ -5,6 +5,50 @@ from IPython.display import display
 from typing import Optional, List, Tuple
 from grid_mmdp import GridMMDP
 
+def _generate_bellman_html(mdp, planner, state, action):
+    if action is None or mdp.is_terminal(state):
+        return "<div style='padding: 10px; color: #7f8c8d; font-style: italic;'>Terminal state reached. V(s) = 0.0</div>"
+        
+    def get_v(s):
+        if hasattr(planner, 'real_state_value'):
+            return planner.real_state_value(s)
+        return planner.value(s)
+        
+    transitions = mdp.joint_transitions(state, action)
+    
+    terms = []
+    expected_q = 0.0
+    for next_state, prob in transitions:
+        cost = mdp.transition_cost(state, action, next_state)
+        v_next = get_v(next_state)
+        expected_q += prob * (cost + v_next)
+        terms.append(f"{prob:.2f} \\times [{cost:.1f} + {v_next:.2f}]")
+        
+    if len(terms) > 3:
+        chunks = [" + ".join(terms[i:i+3]) for i in range(0, len(terms), 3)]
+        sum_str = " + \\\\ & ".join(chunks)
+        sum_str = f"\\begin{{aligned}} = & {sum_str} \\end{{aligned}}"
+    else:
+        sum_str = "= " + " + ".join(terms)
+        
+    act_str = ",".join(action)
+    
+    html = f"""
+    <div style="background-color: #fdfbf7; padding: 15px; border-radius: 8px; border: 1px solid #e1d8c1; margin-top: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-width: 400px; max-width: 650px;">
+        <h4 style="margin-top: 0; margin-bottom: 10px; color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px;">Live Bellman Equation</h4>
+        <div style="font-size: 1.1em; margin-bottom: 10px; color: #34495e;">
+            \\( Q(s, a) = \\sum_{{s'}} P(s'|s,a) \\left[ c(s,a,s') + V(s') \\right] \\)
+        </div>
+        <div style="font-size: 1.0em; margin-bottom: 15px; color: #c0392b; overflow-x: auto;">
+            \\( {sum_str} \\)
+        </div>
+        <div style="font-size: 1.2em; font-weight: bold; color: #27ae60; border-top: 1px dashed #ccc; padding-top: 10px;">
+            \\( Q(s, \\text{{{act_str}}}) = {expected_q:.3f} \\)
+        </div>
+    </div>
+    """
+    return html
+
 class TrajectoryVisualizer:
     def __init__(self, mdp: GridMMDP, planner, max_steps: int = 50, seed: int = 42):
         self.mdp = mdp
@@ -39,6 +83,7 @@ class TrajectoryVisualizer:
         self.fig, self.ax = None, None
         self.colors = ['#ff7675', '#74b9ff', '#00b894', '#e17055', '#0984e3', '#b2bec3']
         self.tree_html = widgets.HTML(value="")
+        self.bellman_html = widgets.HTMLMath(value="")
         
     def draw_grid(self, ax):
         grid = self.mdp.instance.grid_map
@@ -69,7 +114,14 @@ class TrajectoryVisualizer:
             
     def render_step(self, step: int):
         if not self.fig:
-            self.fig, self.ax = plt.subplots(figsize=(5, 5))
+            width = self.mdp.instance.grid_map.width
+            height = self.mdp.instance.grid_map.height
+            aspect_ratio = width / height
+            
+            fig_width = min(15.0, max(5.0, width * 0.2))
+            fig_height = fig_width / aspect_ratio
+            
+            self.fig, self.ax = plt.subplots(figsize=(fig_width, fig_height))
             
         self.draw_grid(self.ax)
         
@@ -103,6 +155,8 @@ class TrajectoryVisualizer:
             self.tree_html.value = f"<div style='display: flex; flex-direction: column; gap: 20px; align-items: center;'>{svg_no}{svg_od}</div>"
         except Exception as e:
             self.tree_html.value = f"<b style='color:red;'>Graphviz error: {e}</b><br>Make sure 'graphviz' is installed."
+            
+        self.bellman_html.value = _generate_bellman_html(self.mdp, self.planner, state, act)
         
     def show_with_tree(self):
         if not self.trajectory:
@@ -144,7 +198,7 @@ class TrajectoryVisualizer:
         
         controls = widgets.HBox([icon_fix_css, play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
         
-        left_side = widgets.VBox([grid_output, controls], layout=widgets.Layout(align_items='center'))
+        left_side = widgets.VBox([grid_output, controls, self.bellman_html], layout=widgets.Layout(align_items='center'))
             
         # Combine Side-by-Side
         main_layout = widgets.HBox([left_side, self.tree_html], layout=widgets.Layout(align_items='center', justify_content='space-around'))
@@ -165,6 +219,10 @@ class DualTrajectoryVisualizer:
         self.fig, (self.ax1, self.ax2) = None, (None, None)
         self.colors = ['#ff7675', '#74b9ff', '#00b894', '#e17055', '#0984e3', '#b2bec3']
         self.tree_html = widgets.HTML(value="")
+        self.bellman_base_html = widgets.HTMLMath(value="")
+        self.bellman_od_html = widgets.HTMLMath(value="")
+        self.baseline_planner = baseline_planner
+        self.od_planner = od_planner
         
     def _simulate(self, planner, seed):
         import random
@@ -222,7 +280,14 @@ class DualTrajectoryVisualizer:
 
     def render_step(self, step: int):
         if not self.fig:
-            self.fig, (self.ax1, self.ax2) = plt.subplots(1, 2, figsize=(10, 5))
+            width = self.mdp.instance.grid_map.width
+            height = self.mdp.instance.grid_map.height
+            aspect_ratio = width / height
+            
+            base_fig_width = min(9.0, max(4.0, width * 0.15))
+            fig_height = base_fig_width / aspect_ratio
+            
+            self.fig, (self.ax1, self.ax2) = plt.subplots(1, 2, figsize=(base_fig_width * 2, fig_height))
             
         self.draw_grid(self.ax1)
         self.draw_grid(self.ax2)
@@ -230,6 +295,7 @@ class DualTrajectoryVisualizer:
         # Baseline
         s_idx1 = min(step, len(self.traj_base)-1)
         state1 = self.traj_base[s_idx1]
+        act1 = self.actions_base[s_idx1] if s_idx1 < len(self.actions_base) else None
         for i, pos in enumerate(state1):
             if pos != self.mdp.instance.goals[i]:
                 color = self.colors[i % len(self.colors)]
@@ -240,10 +306,12 @@ class DualTrajectoryVisualizer:
         
         status_text1 = "Success" if self.success_base and s_idx1 == len(self.traj_base)-1 else ("Failed" if s_idx1 == len(self.traj_base)-1 else "Running")
         self.ax1.set_title(f"Baseline (Joint) | Step {s_idx1} | {status_text1}")
+        self.bellman_base_html.value = _generate_bellman_html(self.mdp, self.baseline_planner, state1, act1)
         
         # OD
         s_idx2 = min(step, len(self.traj_od)-1)
         state2 = self.traj_od[s_idx2]
+        act2 = self.actions_od[s_idx2] if s_idx2 < len(self.actions_od) else None
         for i, pos in enumerate(state2):
             if pos != self.mdp.instance.goals[i]:
                 color = self.colors[i % len(self.colors)]
@@ -254,6 +322,7 @@ class DualTrajectoryVisualizer:
         
         status_text2 = "Success" if self.success_od and s_idx2 == len(self.traj_od)-1 else ("Failed" if s_idx2 == len(self.traj_od)-1 else "Running")
         self.ax2.set_title(f"Operator Decomposition | Step {s_idx2} | {status_text2}")
+        self.bellman_od_html.value = _generate_bellman_html(self.mdp, self.od_planner, state2, act2)
         
         self.fig.canvas.draw()
         
@@ -300,4 +369,5 @@ class DualTrajectoryVisualizer:
         """)
         
         controls = widgets.HBox([icon_fix_css, play, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
-        display(widgets.VBox([grid_output, controls, self.tree_html], layout=widgets.Layout(align_items='center')))
+        bellmans = widgets.HBox([self.bellman_base_html, self.bellman_od_html], layout=widgets.Layout(justify_content='space-around', width='100%'))
+        display(widgets.VBox([grid_output, controls, bellmans, self.tree_html], layout=widgets.Layout(align_items='center')))
