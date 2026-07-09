@@ -122,30 +122,36 @@ class TrajectoryVisualizer:
                     
         slider.observe(on_change)
         
-        hidden_play = widgets.Play(min=0, max=self.max_steps, step=1, interval=400, show_repeat=False)
-        widgets.jslink((hidden_play, 'value'), (slider, 'value'))
-        
+        self.playing = False
         play_btn = widgets.Button(description='▶ Play', button_style='success')
         
+        async def play_loop():
+            import asyncio
+            while self.playing and slider.value < self.max_steps:
+                await asyncio.sleep(0.5)
+                slider.value += 1
+            self.playing = False
+            play_btn.description = '▶ Play'
+            play_btn.button_style = 'success'
+            
         def on_play_clicked(b):
-            if not hidden_play.playing:
-                if slider.value == self.max_steps:
-                    slider.value = 0
-                    hidden_play.value = 0
-                hidden_play.playing = True
+            if not self.playing:
+                self.playing = True
                 play_btn.description = '⏸ Pause'
                 play_btn.button_style = 'warning'
+                if slider.value == self.max_steps:
+                    slider.value = 0
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(play_loop())
+                except RuntimeError:
+                    asyncio.run(play_loop())
             else:
-                hidden_play.playing = False
+                self.playing = False
                 play_btn.description = '▶ Play'
                 play_btn.button_style = 'success'
                 
-        def on_play_state_change(change):
-            if not change['new']: # Stopped playing
-                play_btn.description = '▶ Play'
-                play_btn.button_style = 'success'
-                
-        hidden_play.observe(on_play_state_change, names='playing')
         play_btn.on_click(on_play_clicked)
         
         controls = widgets.HBox([play_btn, slider], layout=widgets.Layout(align_items='center', justify_content='center', margin='10px 0px 0px 0px'))
