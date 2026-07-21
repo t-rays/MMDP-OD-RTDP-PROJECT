@@ -20,29 +20,32 @@ def plot_map_visualization(map_name, scen_name, num_agents):
     starts = [t.start for t in tasks]
     goals = [t.goal for t in tasks]
     
+    # We only color obstacles, floors remain white (img is initialized to 1s)
     img = np.ones((grid_map.height, grid_map.width, 3))
     for (x, y) in grid_map.obstacles:
-        img[y, x] = [0.2, 0.2, 0.2] # Dark grey obstacles
+        img[y, x] = [0.3, 0.3, 0.3] # Dark grey obstacles
         
-    cmap = plt.get_cmap('tab20')
+    cmap = plt.get_cmap('tab10')
     colors = [cmap(i)[:3] for i in range(num_agents)]
     
-    for i, start in enumerate(starts):
-        img[start[1], start[0]] = colors[i]
-    for i, goal in enumerate(goals):
-        img[goal[1], goal[0]] = [c*0.6 for c in colors[i]]
-        
-    fig, ax = plt.subplots(figsize=(6, 6))
+    fig, ax = plt.subplots(figsize=(8, 8))
     ax.imshow(img)
     
-    for i, start in enumerate(starts):
-        ax.plot(start[0], start[1], marker='o', markersize=20, markerfacecolor='white', markeredgecolor='black')
-        ax.text(start[0], start[1], f'{i+1}', ha='center', va='center', color='black', fontweight='bold', fontsize=10)
-    for i, goal in enumerate(goals):
-        ax.plot(goal[0], goal[1], marker='*', markersize=28, markerfacecolor='white', markeredgecolor='black')
-        ax.text(goal[0], goal[1], f'{i+1}', ha='center', va='center', color='black', fontweight='bold', fontsize=10)
+    for i, (start, goal) in enumerate(zip(starts, goals)):
+        c = colors[i]
         
-    ax.set_title(f'Visualizing Map: {map_name} ({num_agents} Agents)', fontsize=14)
+        # Draw a faint dashed line connecting Start and Goal for instant visual clarity
+        ax.plot([start[0], goal[0]], [start[1], goal[1]], color=c, linestyle='--', alpha=0.5, linewidth=2)
+        
+        # Draw Start: Solid Circle with Agent ID
+        ax.plot(start[0], start[1], marker='o', markersize=22, markerfacecolor=c, markeredgecolor='black', markeredgewidth=1.5)
+        ax.text(start[0], start[1], f'{i+1}', ha='center', va='center', color='white', fontweight='bold', fontsize=11)
+        
+        # Draw Goal: Solid Star with Agent ID
+        ax.plot(goal[0], goal[1], marker='*', markersize=30, markerfacecolor=c, markeredgecolor='black', markeredgewidth=1.5)
+        ax.text(goal[0], goal[1], f'{i+1}', ha='center', va='center', color='white', fontweight='bold', fontsize=11)
+        
+    ax.set_title(f'Map Layout: {map_name} ({num_agents} Agents)', fontsize=16, pad=15)
     ax.set_xticks(np.arange(-0.5, grid_map.width, 1), minor=True)
     ax.set_yticks(np.arange(-0.5, grid_map.height, 1), minor=True)
     ax.grid(which='minor', color='black', linestyle='-', linewidth=1)
