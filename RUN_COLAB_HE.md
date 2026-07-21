@@ -1,6 +1,6 @@
 # הוראות הפעלה קצרות
 
-1. פתחו את `MMDP_V16_Colab_One_Map_Per_Level.ipynb` ב-Google Colab.
+1. פתחו את `MMDP_Colab_One_Map_Per_Level.ipynb` ב-Google Colab.
 2. הריצו את תאי ההכנה הראשונים (שכפול המאגר והתקנת החבילה).
 3. הריצו את התא של המפה הרצויה: קלה, בינונית או קשה.
 4. כל תא כולל מפה אחת ו-24 conditions.
