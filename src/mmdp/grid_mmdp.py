@@ -34,7 +34,7 @@ import math
 import random
 from typing import Iterator
 
-from map_creator import MapInstance, Position
+from mmdp.map_creator import MapInstance, Position
 
 
 State = tuple[Position, ...]

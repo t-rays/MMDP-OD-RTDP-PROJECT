@@ -16,8 +16,8 @@ import statistics
 import time
 from typing import Any, Protocol
 
-from grid_mmdp import GridMMDP, JointAction, State, Transition
-from resource_monitor import ResourceMonitor
+from mmdp.grid_mmdp import GridMMDP, JointAction, State, Transition
+from mmdp.resource_monitor import ResourceMonitor
 
 
 class PolicyPlanner(Protocol):

@@ -13,12 +13,13 @@ import itertools
 import json
 import os
 from pathlib import Path
-import random
 import subprocess
 import sys
 import tempfile
 import time
 from typing import Any
+
+from mmdp.experiments.seeds import seed_pairs
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFESTS = {
@@ -46,20 +47,6 @@ COMPACT_FIELDS = [
     "evaluation_time_seconds",
     "condition_time_seconds",
 ]
-
-
-def _seed_pairs(master_seed: int, count: int) -> list[tuple[int, int]]:
-    rng = random.Random(master_seed)
-    pairs: list[tuple[int, int]] = []
-    used: set[int] = set()
-    while len(pairs) < count:
-        planning = rng.randrange(0, 2**31)
-        evaluation = rng.randrange(0, 2**63)
-        if planning in used:
-            continue
-        used.add(planning)
-        pairs.append((planning, evaluation))
-    return pairs
 
 
 def _append_options(command: list[str], options: dict[str, Any]) -> None:
@@ -167,7 +154,7 @@ def main() -> None:
     manifest = json.loads(MANIFESTS[args.group].read_text(encoding="utf-8"))
     output = args.output.resolve()
     master_seed = int(manifest["master_seed"])
-    seed_pairs = _seed_pairs(master_seed, int(manifest["seed_count"]))
+    resolved_seed_pairs = seed_pairs(master_seed, int(manifest["seed_count"]))
     algorithms = list(manifest["algorithms"])
     common = dict(manifest["experiments_args"])
     watchdog = float(manifest["condition_watchdog_seconds"])
@@ -176,7 +163,7 @@ def main() -> None:
     conditions: list[tuple[dict[str, Any], int, tuple[int, int], str]] = []
     for map_spec in manifest["maps"]:
         for n_agents, indexed_seed, algorithm in itertools.product(
-            map_spec["agent_counts"], enumerate(seed_pairs), algorithms
+            map_spec["agent_counts"], enumerate(resolved_seed_pairs), algorithms
         ):
             conditions.append((map_spec, n_agents, indexed_seed, algorithm))
 
@@ -186,6 +173,8 @@ def main() -> None:
     for index, (map_spec, n_agents, indexed_seed, algorithm) in enumerate(conditions, 1):
         seed_index, (planning_seed, evaluation_seed) = indexed_seed
         map_path = (ROOT / map_spec["folder"]).resolve()
+        # The "v15|" prefix is kept intentionally so existing compact CSVs
+        # keep resuming correctly; it is a schema tag, not a code version.
         run_id = (
             f"v15|{args.group}|{map_path.name}|a{n_agents}|"
             f"s{seed_index}|p{planning_seed}|e{evaluation_seed}|{algorithm}"
@@ -200,7 +189,7 @@ def main() -> None:
         if args.dry_run:
             continue
 
-        with tempfile.TemporaryDirectory(prefix="mmdp_v15_") as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="mmdp_") as temp_dir:
             full_csv = Path(temp_dir) / "full.csv"
             command = [
                 sys.executable,

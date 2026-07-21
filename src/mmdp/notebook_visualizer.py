@@ -1,17 +1,24 @@
-import sys
+"""Matplotlib map/start-goal visualizations for notebooks."""
+
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
-SRC_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SRC_DIR.parent
+from mmdp.map_creator import load_map_file, load_scenario_file
 
-# Import the existing map creator logic
-from map_creator import load_map_file, load_scenario_file
 
-def plot_map_visualization(map_name, scen_name, num_agents):
-    map_path = PROJECT_ROOT / 'maps' / map_name / f'{map_name}.map'
-    scen_path = PROJECT_ROOT / 'maps' / map_name / 'scen' / f'{scen_name}.scen'
+def _default_maps_root() -> Path:
+    cwd_maps = Path.cwd() / 'maps'
+    if cwd_maps.is_dir():
+        return cwd_maps
+    # Editable install: src/mmdp/ -> repository root.
+    return Path(__file__).resolve().parents[2] / 'maps'
+
+
+def plot_map_visualization(map_name, scen_name, num_agents, maps_root=None):
+    maps_root = Path(maps_root) if maps_root is not None else _default_maps_root()
+    map_path = maps_root / map_name / f'{map_name}.map'
+    scen_path = maps_root / map_name / 'scen' / f'{scen_name}.scen'
     
     grid_map = load_map_file(map_path)
     scenarios = load_scenario_file(scen_path, expected_map=grid_map)

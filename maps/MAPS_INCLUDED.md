@@ -1,4 +1,4 @@
-# Maps retained in V15
+# Bundled maps
 
 Only three MovingAI benchmark instances are bundled: one per difficulty group.
 

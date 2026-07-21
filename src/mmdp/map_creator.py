@@ -6,13 +6,13 @@ Grid-map and scenario loader for the multi-agent planning project.
 Expected project structure:
 
 final_project/
-└── maps/
-    └── room-64-64-16/
-        ├── room-64-64-16.map
-        ├── scen/
-        │   ├── room-64-64-16-even-1.scen
-        │   └── ...
-        └── room-64-64-16.pdf   # ignored by this module
+â””â”€â”€ maps/
+    â””â”€â”€ room-64-64-16/
+        â”œâ”€â”€ room-64-64-16.map
+        â”œâ”€â”€ scen/
+        â”‚   â”œâ”€â”€ room-64-64-16-even-1.scen
+        â”‚   â””â”€â”€ ...
+        â””â”€â”€ room-64-64-16.pdf   # ignored by this module
 
 The scenario directory can have any name. Scenario files are discovered
 recursively under the selected map folder.
