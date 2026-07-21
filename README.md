@@ -23,7 +23,6 @@ scripts/                  Thin command-line entry points
 tests/                    Pytest smoke and unit tests
 maps/                     Bundled MovingAI benchmark maps
 manifests/final/          Fixed experiment definitions per difficulty
-docs/                     Experiment design and output documentation
 ```
 
 ## Setup
@@ -50,9 +49,6 @@ Re-running a cell resumes from the CSV and skips completed run IDs.
 
 ## Run locally
 
-`local_testing.ipynb` runs the same pipeline against `local_results/`, or use
-the scripts directly:
-
 ```bash
 python scripts/run_compact_matrix.py --group easy --output local_results/MMDP_results.csv
 python scripts/analyze_compact_results.py local_results/MMDP_results.csv --group easy --output-dir local_results/graphs
@@ -68,9 +64,10 @@ python scripts/analyze_compact_results.py local_results/MMDP_results.csv --group
 
 - planning: up to 60 seconds or solved
 - evaluation: up to 5 episodes, with an 8-second stage budget
+- episode step cap by difficulty: 80 / 160 / 260
 - condition watchdog: 75 seconds
 - 2 paired seeds
-- 1--6 agents
+- 1--6 agents (each difficulty cell = 24 conditions: 6 agent counts x 2 seeds x 2 algorithms)
 - cache bound: 100,000 transition entries
 - no evaluation diagnostics or conflict-risk calculations
 
@@ -81,4 +78,11 @@ python scripts/analyze_compact_results.py local_results/MMDP_results.csv --group
 - real states examined
 - evaluation success rate
 
-The analysis creates only three figures per selected map.
+The CSV also keeps minimal run identity, status, seeds, completed evaluation
+episodes, and condition time so failures and timeouts remain transparent.
+
+The analysis creates exactly three figures per selected map:
+
+1. planning time by number of agents
+2. peak planning-memory increase by number of agents
+3. real states examined and evaluation success rate
