@@ -46,7 +46,7 @@ pytest
 
 ## Run in Google Colab
 
-Open `MMDP_Colab_One_Map_Per_Level.ipynb`, run the preparation cells, then
+Open `MMDP-OD-RTDP-MAIN.ipynb`, run the preparation cells, then
 run one of the three difficulty cells. Each difficulty cell runs one map and
 appends results to:
 
