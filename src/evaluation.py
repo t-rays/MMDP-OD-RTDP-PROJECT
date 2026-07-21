@@ -100,6 +100,10 @@ class EvaluationConfig:
     # disabled for the fastest large experiment.
     collect_diagnostics: bool = True
 
+    # Hard budget for the complete evaluation stage. The evaluator always
+    # finishes the current episode, then stops before starting another one.
+    time_limit_seconds: float | None = None
+
     def __post_init__(self) -> None:
         if self.episodes <= 0:
             raise ValueError("episodes must be positive")
@@ -110,6 +114,8 @@ class EvaluationConfig:
             raise ValueError(
                 "max_steps_per_episode must be positive or None"
             )
+        if self.time_limit_seconds is not None and self.time_limit_seconds <= 0:
+            raise ValueError("time_limit_seconds must be positive or None")
 
 
 @dataclass(frozen=True)
@@ -682,6 +688,10 @@ def _build_summary(
         for result in episode_results
     )
 
+    actual_episodes = len(episode_results)
+    if actual_episodes <= 0:
+        raise RuntimeError("Evaluation completed no episodes")
+
     per_agent_arrival_rates: list[float] = []
     per_agent_mean_arrival_times: list[float | None] = []
     for agent_index in range(mdp.n_agents):
@@ -690,7 +700,7 @@ def _build_summary(
             for result in episode_results
             if result.arrival_times[agent_index] is not None
         ]
-        per_agent_arrival_rates.append(len(times) / config.episodes)
+        per_agent_arrival_rates.append(len(times) / actual_episodes)
         per_agent_mean_arrival_times.append(_mean_or_none(times))
 
     policy_stats = _planner_cache_stats(planner)
@@ -702,14 +712,14 @@ def _build_summary(
         scenario_name=mdp.instance.scenario_file.name,
         n_agents=mdp.n_agents,
         evaluation_seed=config.seed,
-        episodes=config.episodes,
+        episodes=actual_episodes,
         max_steps_per_episode=max_steps_per_episode,
         randomize_greedy_ties=config.randomize_greedy_ties,
         cache_only_executed_actions=config.cache_only_executed_actions,
         collect_diagnostics=config.collect_diagnostics,
         successful_episodes=successful_episodes,
-        failed_episodes=config.episodes - successful_episodes,
-        success_rate=successful_episodes / config.episodes,
+        failed_episodes=actual_episodes - successful_episodes,
+        success_rate=successful_episodes / actual_episodes,
         total_environment_steps=total_environment_steps,
         mean_steps_all_episodes=float(
             statistics.fmean(result.steps for result in episode_results)
@@ -896,24 +906,39 @@ def evaluate_policy(
     ]
 
     evaluation_started_at = time.perf_counter()
+    evaluation_deadline = (
+        None
+        if evaluation_config.time_limit_seconds is None
+        else evaluation_started_at + evaluation_config.time_limit_seconds
+    )
+    completed_episode_results: list[EpisodeResult] = []
     monitor = ResourceMonitor().start()
     try:
-        episode_results = tuple(
-            evaluate_episode(
-                mdp,
-                planner,
-                episode_index=episode_index,
-                episode_seed=episode_seed,
-                max_steps=max_steps_per_episode,
-                measure_conflict_risk=evaluation_config.measure_conflict_risk,
-                randomize_greedy_ties=evaluation_config.randomize_greedy_ties,
-                cache_only_executed_actions=(
-                    evaluation_config.cache_only_executed_actions
-                ),
-                collect_diagnostics=evaluation_config.collect_diagnostics,
+        for episode_index, episode_seed in enumerate(episode_seeds):
+            # Always run at least one episode. Afterwards, do not start a new
+            # episode once the fixed evaluation budget has been exhausted.
+            if (
+                completed_episode_results
+                and evaluation_deadline is not None
+                and time.perf_counter() >= evaluation_deadline
+            ):
+                break
+            completed_episode_results.append(
+                evaluate_episode(
+                    mdp,
+                    planner,
+                    episode_index=episode_index,
+                    episode_seed=episode_seed,
+                    max_steps=max_steps_per_episode,
+                    measure_conflict_risk=evaluation_config.measure_conflict_risk,
+                    randomize_greedy_ties=evaluation_config.randomize_greedy_ties,
+                    cache_only_executed_actions=(
+                        evaluation_config.cache_only_executed_actions
+                    ),
+                    collect_diagnostics=evaluation_config.collect_diagnostics,
+                )
             )
-            for episode_index, episode_seed in enumerate(episode_seeds)
-        )
+        episode_results = tuple(completed_episode_results)
     finally:
         resource_snapshot = monitor.stop()
     evaluation_elapsed_seconds = time.perf_counter() - evaluation_started_at

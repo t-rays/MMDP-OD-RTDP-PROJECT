@@ -27,7 +27,7 @@ import random
 import time
 from typing import Callable, Iterator
 
-from grid_mmdp import GridMMDP, JointAction, State
+from grid_mmdp import ACTIONS, GridMMDP, JointAction, State
 from heuristic import ShortestPathHeuristic
 from limits import sequential_multi_agent_step_bound
 from numerics import scaled_residual_ratio, tied_by_ulp
@@ -211,6 +211,10 @@ class BaselineRTDP:
         self._policy_cache_hits = 0
         self._policy_cache_misses = 0
 
+        # The immediate SSP cost depends only on the current real state.
+        # Cache it because one greedy decision evaluates up to 5**n actions.
+        self._state_step_cost_cache: dict[State, float] = {}
+
         self.bellman_backups = 0
         self.planning_action_evaluations = 0
         self.transition_outcomes_evaluated = 0
@@ -271,6 +275,7 @@ class BaselineRTDP:
         self.solved_checks = 0
         self._policy_candidate_cache.clear()
         self.reset_policy_cache_stats()
+        self._state_step_cost_cache.clear()
 
         self.bellman_backups = 0
         self.planning_action_evaluations = 0
@@ -323,6 +328,28 @@ class BaselineRTDP:
 
         return self.heuristic(state)
 
+    def _value_unchecked(self, state: State) -> float:
+        """Fast internal value lookup for successors produced by the MMDP."""
+        if state == self.mdp.goals:
+            return 0.0
+        stored = self.V.get(state)
+        if stored is not None:
+            return stored
+        return self.heuristic(state)
+
+    def _step_cost_unchecked(self, state: State) -> float:
+        cached = self._state_step_cost_cache.get(state)
+        if cached is not None:
+            return cached
+        cost = float(
+            sum(
+                position != goal
+                for position, goal in zip(state, self.mdp.goals)
+            )
+        )
+        self._state_step_cost_cache[state] = cost
+        return cost
+
     def q_value(
         self,
         state: State,
@@ -360,26 +387,18 @@ class BaselineRTDP:
                 transitions
             )
 
+        # In this MMDP the immediate cost is the number of unfinished agents
+        # in the current state.  It is identical for every successor of every
+        # action at this state, so compute it once instead of once per outcome.
+        immediate_cost = self._step_cost_unchecked(state)
         expected_cost = 0.0
 
         for next_state, probability in transitions:
-            self._check_deadline(
-                deadline
-            )
-
-            immediate_cost = self.mdp.transition_cost(
-                state,
-                joint_action,
-                next_state,
-            )
-
-            future_cost = self.value(
-                next_state
-            )
-
-            expected_cost += probability * (
-                immediate_cost + future_cost
-            )
+            self._check_deadline(deadline)
+            future_cost = self._value_unchecked(next_state)
+            # Keep the original floating-point operation order so tie and
+            # residual behavior remain reproducible.
+            expected_cost += probability * (immediate_cost + future_cost)
 
         return expected_cost
 
@@ -948,13 +967,34 @@ class BaselineRTDP:
         best_value = math.inf
         best_actions: list[JointAction] = []
 
+        # Different action labels can induce exactly the same physical one-step
+        # dynamics (blocked moves, explicit stay, or frozen goal agents).  The
+        # Baseline policy still considers every labelled joint action so tie
+        # behavior is preserved, but Q is computed only once per distinct
+        # intended joint state during fixed-policy evaluation.
+        intended_by_agent = tuple(
+            {
+                action: self.mdp.move_one(agent_index, position, action)
+                for action in ACTIONS
+            }
+            for agent_index, position in enumerate(state)
+        )
+        physical_q_cache: dict[State, float] = {}
+
         for joint_action in self.mdp.all_joint_actions():
-            action_value = self.q_value(
-                state,
-                joint_action,
-                count_metrics=False,
-                deadline=None,
+            intended_state = tuple(
+                intended_by_agent[agent_index][action]
+                for agent_index, action in enumerate(joint_action)
             )
+            action_value = physical_q_cache.get(intended_state)
+            if action_value is None:
+                action_value = self.q_value(
+                    state,
+                    joint_action,
+                    count_metrics=False,
+                    deadline=None,
+                )
+                physical_q_cache[intended_state] = action_value
 
             if action_value < best_value and not self._values_tied(action_value, best_value):
                 best_value = action_value

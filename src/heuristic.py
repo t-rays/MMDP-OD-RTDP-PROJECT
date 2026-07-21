@@ -161,6 +161,16 @@ class ShortestPathHeuristic:
     movement_success_probability: float = field(
         init=False,
     )
+    _state_value_cache: dict[State, float] = field(
+        init=False,
+        repr=False,
+        default_factory=dict,
+    )
+    _distance_summary_cache: dict[State, tuple[float, ...]] = field(
+        init=False,
+        repr=False,
+        default_factory=dict,
+    )
 
     def __post_init__(self) -> None:
         self.movement_success_probability = (
@@ -244,23 +254,33 @@ class ShortestPathHeuristic:
         Return the Baseline lower bound:
 
             h(state) = sum_i shortest_distance_i / movement_success_probability
-        """
-        self.mdp.validate_state(state)
 
+        The map, goals, and slip probability are immutable, so the heuristic is
+        immutable as well.  Evaluation revisits the same successor states many
+        thousands of times while comparing joint actions; memoizing the result
+        avoids recomputing the same sum and repeated validation.
+        """
+        cached = self._state_value_cache.get(state)
+        if cached is not None:
+            return cached
+
+        self.mdp.validate_state(state)
         total = 0.0
 
         for agent_index, position in enumerate(state):
-            contribution = self.stochastic_agent_distance(
-                agent_index,
-                position,
+            distance = float(
+                self.distance_tables[agent_index].get(position, math.inf)
             )
-
-            if math.isinf(contribution):
+            if math.isinf(distance):
+                self._state_value_cache[state] = math.inf
                 return math.inf
+            # Preserve the original operation order exactly: each agent's
+            # distance is divided before the contributions are accumulated.
+            total += distance / self.movement_success_probability
 
-            total += contribution
-
-        return total
+        result = total
+        self._state_value_cache[state] = result
+        return result
 
     def deterministic_result(
         self,
@@ -803,12 +823,14 @@ class ShortestPathHeuristic:
         state: State,
     ) -> tuple[float, ...]:
         """Return deterministic shortest-path distances for limits and logs."""
-        self.mdp.validate_state(state)
+        cached = self._distance_summary_cache.get(state)
+        if cached is not None:
+            return cached
 
-        return tuple(
-            self.agent_distance(
-                agent_index,
-                position,
-            )
+        self.mdp.validate_state(state)
+        result = tuple(
+            float(self.distance_tables[agent_index].get(position, math.inf))
             for agent_index, position in enumerate(state)
         )
+        self._distance_summary_cache[state] = result
+        return result

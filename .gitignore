@@ -1,6 +1,8 @@
 __pycache__/
-*.pyc
-results/
-.env
+*.py[cod]
 .ipynb_checkpoints/
-demo_flow_standalone.ipynb
+results/
+validation/
+*.log
+*.tmp
+.DS_Store

@@ -422,9 +422,7 @@ class GridMMDP:
         The distribution is cached because it depends only on the immutable
         MMDP definition, the current state, and the joint action.
         """
-        self.validate_state(state)
-        self.validate_joint_action(joint_action)
-
+        # Callers validate once before entering this private hot path.
         cache_key = (
             state,
             joint_action,
@@ -546,11 +544,27 @@ class GridMMDP:
         state: State,
         next_state: State,
     ) -> bool:
-        """Return True for a vertex conflict or an edge-swap conflict."""
-        return (
-            self.vertex_conflict_count(next_state) > 0
-            or self.edge_swap_conflict_count(state, next_state) > 0
-        )
+        """Return True for a vertex conflict or an edge-swap conflict.
+
+        This boolean check is on the transition-generation hot path.  It uses
+        early exits instead of constructing full conflict counts, while the
+        public counting helpers remain available for diagnostics.
+        """
+        if len(set(next_state)) != len(next_state):
+            return True
+
+        n_agents = len(state)
+        for first_agent in range(n_agents):
+            first_start = state[first_agent]
+            first_end = next_state[first_agent]
+            for second_agent in range(first_agent + 1, n_agents):
+                if (
+                    first_start == next_state[second_agent]
+                    and state[second_agent] == first_end
+                    and first_start != state[second_agent]
+                ):
+                    return True
+        return False
 
     def conflict_probability(
         self,
@@ -558,6 +572,8 @@ class GridMMDP:
         joint_action: JointAction,
     ) -> float:
         """Return the probability mass of conflicting raw outcomes."""
+        self.validate_state(state)
+        self.validate_joint_action(joint_action)
         return sum(
             probability
             for next_state, probability
