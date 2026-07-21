@@ -13,7 +13,7 @@ from pathlib import Path
 from mmdp.experiments.factory import ALGORITHMS
 from mmdp.experiments.profiles import RESOURCE_MODES
 from mmdp.experiments.runner import run_experiments
-from mmdp.statistics_utils import (
+from mmdp.analysis.statistics_utils import (
     binomial_worst_case_sample_size,
     consecutive_trials_for_detection,
 )

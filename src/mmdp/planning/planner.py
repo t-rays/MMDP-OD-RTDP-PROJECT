@@ -13,10 +13,10 @@ import time
 import random
 from typing import Generic, Iterator, TypeVar
 
-from mmdp.components import PlanningDomain
-from mmdp.config import RTDPConfig
-from mmdp.exceptions import DeadlineReached, MemoryLimitReached
-from mmdp.numerics import scaled_residual_ratio
+from mmdp.planning.components import PlanningDomain
+from mmdp.planning.config import RTDPConfig
+from mmdp.planning.exceptions import DeadlineReached, MemoryLimitReached
+from mmdp.planning.numerics import scaled_residual_ratio
 from mmdp.resource_monitor import ResourceMonitor
 
 StateType = TypeVar("StateType")

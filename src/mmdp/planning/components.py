@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic, Iterable, Iterator, Sequence, Ty
 
 if TYPE_CHECKING:
     from mmdp.resource_monitor import ResourceMonitor
-    from mmdp.results import TrialResult
+    from mmdp.planning.results import TrialResult
 
 StateType = TypeVar("StateType")
 ActionType = TypeVar("ActionType")

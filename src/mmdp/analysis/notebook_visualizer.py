@@ -4,15 +4,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
-from mmdp.map_creator import load_map_file, load_scenario_file
+from mmdp.domain.map_creator import load_map_file, load_scenario_file
 
 
 def _default_maps_root() -> Path:
     cwd_maps = Path.cwd() / 'maps'
     if cwd_maps.is_dir():
         return cwd_maps
-    # Editable install: src/mmdp/ -> repository root.
-    return Path(__file__).resolve().parents[2] / 'maps'
+    # Editable install: src/mmdp/analysis/ -> repository root.
+    return Path(__file__).resolve().parents[3] / 'maps'
 
 
 def plot_map_visualization(map_name, scen_name, num_agents, maps_root=None):

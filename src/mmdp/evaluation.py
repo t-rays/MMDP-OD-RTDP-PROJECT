@@ -16,7 +16,7 @@ import statistics
 import time
 from typing import Any, Protocol
 
-from mmdp.grid_mmdp import GridMMDP, JointAction, State, Transition
+from mmdp.domain.grid_mmdp import GridMMDP, JointAction, State, Transition
 from mmdp.resource_monitor import ResourceMonitor
 
 

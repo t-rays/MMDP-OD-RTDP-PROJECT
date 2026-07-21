@@ -7,18 +7,25 @@ This project compares Baseline RTDP and OD-RTDP on three MovingAI maps with
 
 ```
 src/mmdp/                 Installable Python package
-    grid_mmdp.py          Stochastic cooperative grid MMDP
-    heuristic.py          Admissible shortest-path heuristic
-    map_creator.py        MovingAI .map/.scen loading
-    config.py             RTDPConfig shared by both algorithms
-    components.py         Injectable ValueStore / SolvedTracker / TieBreaker
-    domain_base.py        Shared RTDP domain plumbing
-    baseline_rtdp.py      Baseline RTDP planning domain
-    od_rtdp.py            Operator-decomposition planning domain
-    planner.py            Generic RTDP/LRTDP engine
-    results.py            Trial and planning result dataclasses
+    domain/               Grid MMDP, heuristic, MovingAI map loading
+        grid_mmdp.py      Stochastic cooperative grid MMDP
+        heuristic.py      Admissible shortest-path heuristic
+        map_creator.py    MovingAI .map/.scen loading
+    planning/             RTDP/LRTDP engine and both planning domains
+        planner.py        Generic RTDP/LRTDP engine
+        domain_base.py    Shared RTDP domain plumbing
+        baseline_rtdp.py  Baseline RTDP planning domain
+        od_rtdp.py        Operator-decomposition planning domain
+        config.py         RTDPConfig shared by both algorithms
+        components.py     Injectable ValueStore / SolvedTracker / TieBreaker
+        results.py        Trial and planning result dataclasses
+        exceptions.py     Deadline / memory-limit control-flow signals
+        limits.py         Step-bound resolution
+        numerics.py       Residual and tie-comparison helpers
     evaluation.py         Fixed-policy evaluation
+    resource_monitor.py   CPU/RSS sampling thread
     experiments/          Experiment orchestration (schema, factory, runner)
+    analysis/             Statistics helpers and notebook visualizations
 scripts/                  Thin command-line entry points
 tests/                    Pytest smoke and unit tests
 maps/                     Bundled MovingAI benchmark maps

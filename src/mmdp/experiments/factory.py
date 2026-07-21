@@ -5,20 +5,20 @@ from __future__ import annotations
 import argparse
 from typing import Any
 
-from mmdp.baseline_rtdp import BaselineDomain
-from mmdp.components import (
+from mmdp.planning.baseline_rtdp import BaselineDomain
+from mmdp.planning.components import (
     DeterministicTieBreaker,
     DictValueStore,
     SetSolvedTracker,
 )
-from mmdp.config import RTDPConfig
+from mmdp.planning.config import RTDPConfig
 from mmdp.evaluation import EvaluationConfig
 from mmdp.experiments.profiles import resolve_resource_limits
-from mmdp.grid_mmdp import GridMMDP, MMDPConfig
-from mmdp.heuristic import ShortestPathHeuristic
-from mmdp.od_rtdp import OperatorDecompositionDomain
-from mmdp.planner import RTDPPlanner
-from mmdp.results import ODRTDPPlanningResult, RTDPPlanningResult
+from mmdp.domain.grid_mmdp import GridMMDP, MMDPConfig
+from mmdp.domain.heuristic import ShortestPathHeuristic
+from mmdp.planning.od_rtdp import OperatorDecompositionDomain
+from mmdp.planning.planner import RTDPPlanner
+from mmdp.planning.results import ODRTDPPlanningResult, RTDPPlanningResult
 
 ALGORITHMS = ("baseline", "od")
 

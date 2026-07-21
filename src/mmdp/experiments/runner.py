@@ -42,9 +42,9 @@ from mmdp.experiments.schema import (
     normalized_row,
 )
 from mmdp.experiments.seeds import seed_pairs
-from mmdp.grid_mmdp import GridMMDP
-from mmdp.heuristic import ShortestPathHeuristic
-from mmdp.map_creator import MapInstance, create_map_instance
+from mmdp.domain.grid_mmdp import GridMMDP
+from mmdp.domain.heuristic import ShortestPathHeuristic
+from mmdp.domain.map_creator import MapInstance, create_map_instance
 
 
 def read_existing_run_ids(output_path: Path) -> set[str]:

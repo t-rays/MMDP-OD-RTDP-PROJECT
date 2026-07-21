@@ -14,11 +14,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from mmdp.config import RTDPConfig
+from mmdp.planning.config import RTDPConfig
 from mmdp.evaluation import EvaluationConfig
-from mmdp.grid_mmdp import GridMMDP, MMDPConfig
-from mmdp.heuristic import ShortestPathHeuristic
-from mmdp.map_creator import MapInstance
+from mmdp.domain.grid_mmdp import GridMMDP, MMDPConfig
+from mmdp.domain.heuristic import ShortestPathHeuristic
+from mmdp.domain.map_creator import MapInstance
 
 IMPLEMENTATION_VERSION = "focused-metrics-v16-clean-architecture"
 

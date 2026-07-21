@@ -17,12 +17,12 @@ import time
 from abc import abstractmethod
 from typing import Any, Generic, Iterator, TypeVar
 
-from mmdp.components import PlanningDomain, SolvedTracker, TieBreaker, ValueStore
-from mmdp.config import RTDPConfig
-from mmdp.exceptions import DeadlineReached, MemoryLimitReached
-from mmdp.grid_mmdp import GridMMDP
-from mmdp.numerics import scaled_residual_ratio, tied_by_ulp
-from mmdp.results import TrialResult
+from mmdp.planning.components import PlanningDomain, SolvedTracker, TieBreaker, ValueStore
+from mmdp.planning.config import RTDPConfig
+from mmdp.planning.exceptions import DeadlineReached, MemoryLimitReached
+from mmdp.domain.grid_mmdp import GridMMDP
+from mmdp.planning.numerics import scaled_residual_ratio, tied_by_ulp
+from mmdp.planning.results import TrialResult
 
 StateType = TypeVar("StateType")
 ActionType = TypeVar("ActionType")
@@ -93,7 +93,7 @@ class RTDPDomainBase(PlanningDomain[StateType, ActionType], Generic[StateType, A
                 ),
             )
 
-        from mmdp.limits import sequential_multi_agent_step_bound
+        from mmdp.planning.limits import sequential_multi_agent_step_bound
 
         return sequential_multi_agent_step_bound(
             distances,

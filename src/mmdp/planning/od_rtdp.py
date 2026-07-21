@@ -10,11 +10,11 @@ import math
 import random
 from typing import Any
 
-from mmdp.components import SolvedTracker, TieBreaker, ValueStore
-from mmdp.config import RTDPConfig
-from mmdp.domain_base import RTDPDomainBase
-from mmdp.grid_mmdp import ACTIONS, Action, GridMMDP, JointAction, State
-from mmdp.heuristic import ShortestPathHeuristic
+from mmdp.planning.components import SolvedTracker, TieBreaker, ValueStore
+from mmdp.planning.config import RTDPConfig
+from mmdp.planning.domain_base import RTDPDomainBase
+from mmdp.domain.grid_mmdp import ACTIONS, Action, GridMMDP, JointAction, State
+from mmdp.domain.heuristic import ShortestPathHeuristic
 
 ODState = tuple[State, JointAction]
 

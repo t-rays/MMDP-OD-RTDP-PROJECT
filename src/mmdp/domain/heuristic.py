@@ -54,14 +54,14 @@ from dataclasses import dataclass, field
 import math
 from typing import Sequence
 
-from mmdp.grid_mmdp import (
+from mmdp.domain.grid_mmdp import (
     ACTIONS,
     Action,
     GridMMDP,
     JointAction,
     State,
 )
-from mmdp.map_creator import Position
+from mmdp.domain.map_creator import Position
 
 
 DistanceTable = dict[Position, int]
