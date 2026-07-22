@@ -344,21 +344,6 @@ class ShortestPathHeuristic:
 
         return expected
 
-    def best_optimistic_distance(
-        self,
-        agent_index: int,
-        position: Position,
-    ) -> float:
-        """Backward-compatible deterministic one-step distance helper."""
-        return min(
-            self.distance_after_action(
-                agent_index,
-                position,
-                action,
-            )
-            for action in ACTIONS
-        )
-
     def safe_expected_stochastic_distance_after_action(
         self,
         agent_index: int,
@@ -810,13 +795,6 @@ class ShortestPathHeuristic:
             ),
             -self.local_degree(intended_position),
         )
-
-    def value_for_od_state(
-        self,
-        od_state: tuple[State, JointAction],
-    ) -> float:
-        state, prefix = od_state
-        return self.od_value(state, prefix)
 
     def distance_summary(
         self,

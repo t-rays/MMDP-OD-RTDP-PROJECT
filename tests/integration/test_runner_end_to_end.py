@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_run_experiments_cli_writes_ok_rows(tmp_path: Path) -> None:
@@ -15,8 +15,6 @@ def test_run_experiments_cli_writes_ok_rows(tmp_path: Path) -> None:
         str(REPO_ROOT / "scripts" / "run_experiments.py"),
         str(REPO_ROOT / "maps" / "empty-8-8"),
         "--agent-counts", "2",
-        "--planning-seeds", "7",
-        "--evaluation-seeds", "11",
         "--resource-mode", "time_or_solved",
         "--time-limit-seconds", "15",
         "--evaluation-episodes", "3",

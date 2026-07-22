@@ -1,15 +1,133 @@
 from __future__ import annotations
 
+"""RTDP configuration and small shared planning helpers.
+
+The project previously kept numerical comparisons, step-bound calculations,
+and control-flow exceptions in three tiny modules.  They are collected here
+because all of them support the shared RTDP configuration and stopping logic.
+"""
+
+import math
+from collections.abc import Iterable
 from dataclasses import dataclass
+
+
+class DeadlineReached(RuntimeError):
+    """Signal used to stop planning when the time limit is reached."""
+
+
+class MemoryLimitReached(RuntimeError):
+    """Signal used to stop planning at the configured RSS delta."""
+
+
+def tied_by_ulp(a: float, b: float, *, ulps: int = 8) -> bool:
+    """Return True when two finite values differ only by floating-point noise."""
+    if a == b:
+        return True
+    if not math.isfinite(a) or not math.isfinite(b):
+        return False
+    tolerance = ulps * max(math.ulp(a), math.ulp(b), math.ulp(1.0))
+    return abs(a - b) <= tolerance
+
+
+def scaled_residual_ratio(
+    old_value: float,
+    new_value: float,
+    *,
+    absolute_tolerance: float,
+    relative_tolerance: float,
+) -> float:
+    """Return residual divided by a scale-aware admissible tolerance."""
+    residual = abs(new_value - old_value)
+    scale = max(1.0, abs(old_value), abs(new_value))
+    allowed = absolute_tolerance + relative_tolerance * scale
+    if allowed == 0.0:
+        return 0.0 if residual == 0.0 else math.inf
+    return residual / allowed
+
+
+def isolated_success_attempt_bound(
+    required_successes: int,
+    success_probability: float,
+    tail_probability: float,
+) -> int:
+    """Return a conservative attempt bound for stochastic movement.
+
+    For ``X ~ Binomial(t, q)``, the implementation uses a Chernoff lower-tail
+    bound and returns the smallest ``t`` whose probability of obtaining fewer
+    than ``required_successes`` successful moves is at most
+    ``tail_probability``.
+    """
+    if required_successes < 0:
+        raise ValueError("required_successes cannot be negative")
+    if required_successes == 0:
+        return 0
+    if not 0.0 < success_probability <= 1.0:
+        raise ValueError("success_probability must be in (0, 1]")
+    if not 0.0 < tail_probability < 1.0:
+        raise ValueError("tail_probability must be in (0, 1)")
+    if success_probability == 1.0:
+        return required_successes
+
+    failure_threshold = required_successes - 1
+
+    def failure_bound(attempts: int) -> float:
+        mean = attempts * success_probability
+        if failure_threshold >= mean:
+            return 1.0
+        return math.exp(-((mean - failure_threshold) ** 2) / (2.0 * mean))
+
+    lower = max(
+        required_successes,
+        math.ceil(required_successes / success_probability),
+    )
+    upper = lower
+    while failure_bound(upper) > tail_probability:
+        upper *= 2
+
+    while lower < upper:
+        middle = (lower + upper) // 2
+        if failure_bound(middle) <= tail_probability:
+            upper = middle
+        else:
+            lower = middle + 1
+
+    return lower
+
+
+def sequential_multi_agent_step_bound(
+    distances: Iterable[float],
+    success_probability: float,
+    tail_probability: float,
+) -> int:
+    """Return the sum of conservative isolated per-agent attempt bounds."""
+    integer_distances: list[int] = []
+    for distance in distances:
+        if math.isinf(distance):
+            raise ValueError("All distances must be finite")
+        if distance < 0:
+            raise ValueError("Distances cannot be negative")
+        integer_distances.append(math.ceil(distance))
+
+    total = sum(
+        isolated_success_attempt_bound(
+            distance,
+            success_probability,
+            tail_probability,
+        )
+        for distance in integer_distances
+    )
+    return max(1, total)
+
 
 @dataclass(frozen=True)
 class RTDPConfig:
     """Configuration shared by Baseline RTDP and OD-RTDP.
 
-    Algorithmic limits are optional.  ``step_tail_probability`` replaces the
-    former fixed 5x step multiplier with a map-derived stochastic tail bound.
+    Algorithmic limits are optional. ``step_tail_probability`` replaces a
+    fixed step multiplier with a map-derived stochastic tail bound.
     ``memory_limit_mb`` is additional process RSS above the start of planning;
-    final memory-limited experiments should isolate each run in a subprocess.
+    memory-limited experiments should isolate every run in a subprocess.
     """
 
     max_trials: int | None = None
@@ -28,12 +146,11 @@ class RTDPConfig:
     stable_trials_required: int = 44
     stop_when_stable: bool = False
     # LRTDP-style stopping: stop when the initial state is labelled solved.
-    # This is the preferred rule for run-to-convergence experiments.
     stop_when_solved: bool = False
     require_goal_for_stability: bool = True
 
-    # None means an ULP-based numerical comparison; a positive value keeps the
-    # old explicit absolute-tolerance behavior for sensitivity experiments.
+    # None means an ULP-based numerical comparison; a positive value keeps an
+    # explicit absolute-tolerance option for sensitivity experiments.
     tie_tolerance: float | None = None
     tie_ulps: int = 8
     seed: int = 0

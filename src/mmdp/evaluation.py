@@ -249,9 +249,6 @@ class EvaluationResult:
     summary: EvaluationSummary
     episode_results: tuple[EpisodeResult, ...]
 
-    def summary_dict(self) -> dict[str, Any]:
-        return self.summary.to_dict()
-
 
 def _mean_or_none(values: list[float] | list[int]) -> float | None:
     return float(statistics.fmean(values)) if values else None

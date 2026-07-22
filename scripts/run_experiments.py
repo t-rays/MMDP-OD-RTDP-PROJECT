@@ -8,15 +8,42 @@ Install the package first with ``pip install -e .`` from the repository root.
 """
 
 import argparse
+import math
 from pathlib import Path
+from statistics import NormalDist
 
-from mmdp.experiments.factory import ALGORITHMS
-from mmdp.experiments.profiles import RESOURCE_MODES
+from mmdp.experiments.factory import ALGORITHMS, RESOURCE_MODES
+from mmdp.experiments.final_config import FIXED_SEED
 from mmdp.experiments.runner import run_experiments
-from mmdp.analysis.statistics_utils import (
-    binomial_worst_case_sample_size,
-    consecutive_trials_for_detection,
-)
+
+
+def binomial_worst_case_sample_size(
+    *, confidence: float, half_width: float
+) -> int:
+    """Return the normal-approximation sample size for p=0.5."""
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be in (0, 1)")
+    if not 0.0 < half_width < 1.0:
+        raise ValueError("half_width must be in (0, 1)")
+    z = NormalDist().inv_cdf(0.5 + confidence / 2.0)
+    return max(1, math.ceil((z * z * 0.25) / (half_width * half_width)))
+
+
+def consecutive_trials_for_detection(
+    *, confidence: float, minimum_event_probability: float
+) -> int:
+    """Return a transparent default streak length for stability stopping."""
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must be in (0, 1)")
+    if not 0.0 < minimum_event_probability < 1.0:
+        raise ValueError("minimum_event_probability must be in (0, 1)")
+    return max(
+        1,
+        math.ceil(
+            math.log(1.0 - confidence)
+            / math.log(1.0 - minimum_event_probability)
+        ),
+    )
 
 
 def parse_optional_int(text: str) -> int | None:
@@ -97,8 +124,8 @@ def parse_optional_nonnegative_float(text: str) -> float | None:
 def _build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run paired Baseline RTDP and OD-RTDP experiments with optional "
-            "time and process-memory resource regimes."
+            "Run Baseline RTDP and OD-RTDP experiments with one fixed seed and "
+            "optional time and process-memory resource regimes."
         )
     )
     parser.add_argument("map_folders", type=Path, nargs="+")
@@ -107,10 +134,9 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         "--algorithms", choices=ALGORITHMS, nargs="+", default=list(ALGORITHMS)
     )
 
-    parser.add_argument("--planning-seeds", type=int, nargs="+", default=None)
-    parser.add_argument("--evaluation-seeds", type=int, nargs="+", default=None)
-    parser.add_argument("--seed-count", type=int, default=5)
-    parser.add_argument("--master-seed", type=int, default=20260708)
+    # The final experiment uses one project-wide seed. It is intentionally
+    # not exposed as a command-line dimension.
+    parser.set_defaults(seed=FIXED_SEED)
 
     parser.add_argument("--scenario-numbers", type=int, nargs="+", default=[1])
     parser.add_argument("--task-offsets", type=int, nargs="+", default=[0])
@@ -229,10 +255,6 @@ def _validate_cli_arguments(
         parser.error("--stability-confidence must be in (0, 1)")
     if not 0.0 < args.minimum_unstable_trial_rate < 1.0:
         parser.error("--minimum-unstable-trial-rate must be in (0, 1)")
-    if args.seed_count <= 0:
-        parser.error("--seed-count must be positive")
-    if args.evaluation_seeds is not None and args.planning_seeds is None:
-        parser.error("Explicit evaluation seeds require explicit planning seeds")
     if args.epsilon < 0.0 or args.relative_epsilon < 0.0:
         parser.error("Residual tolerances cannot be negative")
     if (

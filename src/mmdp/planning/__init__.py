@@ -10,9 +10,8 @@ from mmdp.planning.components import (
     TieBreaker,
     ValueStore,
 )
-from mmdp.planning.config import RTDPConfig
+from mmdp.planning.config import DeadlineReached, MemoryLimitReached, RTDPConfig
 from mmdp.planning.domain_base import RTDPDomainBase
-from mmdp.planning.exceptions import DeadlineReached, MemoryLimitReached
 from mmdp.planning.od_rtdp import OperatorDecompositionDomain
 from mmdp.planning.planner import RTDPPlanner
 from mmdp.planning.results import (

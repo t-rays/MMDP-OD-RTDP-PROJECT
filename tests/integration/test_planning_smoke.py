@@ -7,7 +7,6 @@ from mmdp import (
     GridMMDP,
     ODRTDPPlanningResult,
     RTDPConfig,
-    RTDPPlanner,
     RTDPPlanningResult,
     ShortestPathHeuristic,
     evaluate_policy,

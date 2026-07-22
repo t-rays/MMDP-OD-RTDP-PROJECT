@@ -3,6 +3,8 @@ from __future__ import annotations
 """Assemble configured planners and configuration dataclasses for one run."""
 
 import argparse
+import json
+from pathlib import Path
 from typing import Any
 
 from mmdp.planning.baseline_rtdp import BaselineDomain
@@ -13,12 +15,55 @@ from mmdp.planning.components import (
 )
 from mmdp.planning.config import RTDPConfig
 from mmdp.evaluation import EvaluationConfig
-from mmdp.experiments.profiles import resolve_resource_limits
 from mmdp.domain.grid_mmdp import GridMMDP, MMDPConfig
 from mmdp.domain.heuristic import ShortestPathHeuristic
 from mmdp.planning.od_rtdp import OperatorDecompositionDomain
 from mmdp.planning.planner import RTDPPlanner
 from mmdp.planning.results import ODRTDPPlanningResult, RTDPPlanningResult
+
+
+RESOURCE_MODES = (
+    "custom",
+    "unconstrained",
+    "time",
+    "time_or_solved",
+    "memory",
+    "time_memory",
+    "time_memory_or_solved",
+)
+
+
+def load_profile(path: str | Path | None) -> dict[str, Any]:
+    """Load an optional JSON file containing time and memory limits."""
+    if path is None:
+        return {}
+    profile_path = Path(path)
+    return json.loads(profile_path.read_text(encoding="utf-8"))
+
+
+def resolve_resource_limits(
+    profile: dict[str, Any],
+    *,
+    map_name: str,
+    n_agents: int,
+) -> tuple[float | None, float | None]:
+    """Resolve exact map/agent limits, then map and global defaults."""
+    map_section = profile.get("maps", {}).get(map_name, {})
+    agent_section = map_section.get("agents", {}).get(str(n_agents), {})
+    defaults = profile.get("defaults", {})
+    time_limit = agent_section.get(
+        "time_limit_seconds",
+        map_section.get("time_limit_seconds", defaults.get("time_limit_seconds")),
+    )
+    memory_limit = agent_section.get(
+        "memory_limit_mb",
+        map_section.get("memory_limit_mb", defaults.get("memory_limit_mb")),
+    )
+    return (
+        None if time_limit is None else float(time_limit),
+        None if memory_limit is None else float(memory_limit),
+    )
+
 
 ALGORITHMS = ("baseline", "od")
 
@@ -66,9 +111,8 @@ def create_planner(
     raise ValueError(f"Unknown algorithm: {algorithm!r}")
 
 
-def planning_config_for_seed(
+def planning_config_from_args(
     args: argparse.Namespace,
-    planning_seed: int,
     *,
     map_name: str,
     n_agents: int,
@@ -174,17 +218,16 @@ def planning_config_for_seed(
         require_goal_for_stability=True,
         tie_tolerance=args.tie_tolerance,
         tie_ulps=args.tie_ulps,
-        seed=planning_seed,
+        seed=args.seed,
     )
 
 
-def evaluation_config_for_seed(
+def evaluation_config_from_args(
     args: argparse.Namespace,
-    evaluation_seed: int,
 ) -> EvaluationConfig:
     return EvaluationConfig(
         episodes=args.evaluation_episodes,
-        seed=evaluation_seed,
+        seed=args.seed,
         max_steps_per_episode=args.evaluation_max_steps,
         measure_conflict_risk=not args.disable_conflict_risk,
         randomize_greedy_ties=args.randomize_evaluation_ties,

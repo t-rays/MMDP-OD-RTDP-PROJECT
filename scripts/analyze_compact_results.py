@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Create exactly three useful figures from the compact experiment CSV."""
+"""Create exactly three figures from the final compact experiment CSV."""
 
 import argparse
 from pathlib import Path
@@ -28,18 +28,25 @@ def _load(csv_path: Path, group: str) -> pd.DataFrame:
         df[column] = pd.to_numeric(df[column], errors="coerce")
     if df.empty:
         raise ValueError(f"No completed rows for group {group}")
-    return df
+    duplicated = df.duplicated(["n_agents", "algorithm"], keep=False)
+    if duplicated.any():
+        duplicates = df.loc[duplicated, ["n_agents", "algorithm"]]
+        raise ValueError(
+            "The final experiment expects one fixed-seed row per condition; "
+            f"duplicates found: {duplicates.to_dict('records')}"
+        )
+    return df.sort_values(["n_agents", "algorithm"])
 
 
-def _mean(df: pd.DataFrame) -> pd.DataFrame:
-    return (
-        df.groupby(["n_agents", "algorithm"], as_index=False)[METRICS]
-        .mean()
-        .sort_values(["n_agents", "algorithm"])
-    )
-
-
-def _plot_metric(summary: pd.DataFrame, metric: str, ylabel: str, title: str, output: Path, log_y: bool = False) -> None:
+def _plot_metric(
+    summary: pd.DataFrame,
+    metric: str,
+    ylabel: str,
+    title: str,
+    output: Path,
+    *,
+    log_y: bool = False,
+) -> None:
     fig, ax = plt.subplots(figsize=(8, 5))
     for algorithm in ("baseline", "od"):
         part = summary[summary["algorithm"] == algorithm].dropna(subset=[metric])
@@ -49,7 +56,7 @@ def _plot_metric(summary: pd.DataFrame, metric: str, ylabel: str, title: str, ou
     ax.set_title(title)
     ax.set_xticks(sorted(summary["n_agents"].dropna().astype(int).unique()))
     ax.grid(True, alpha=0.3)
-    if log_y and (summary[metric].dropna() > 0).all():
+    if log_y and not summary[metric].dropna().empty and (summary[metric].dropna() > 0).all():
         ax.set_yscale("log")
     ax.legend()
     fig.tight_layout()
@@ -64,19 +71,24 @@ def _plot_states_and_success(summary: pd.DataFrame, output: Path) -> None:
     width = 0.36
 
     def values_for(algorithm: str, metric: str) -> list[float]:
-        part = (
-            summary[summary["algorithm"] == algorithm]
-            .set_index("n_agents")[metric]
-        )
+        part = summary[summary["algorithm"] == algorithm].set_index("n_agents")[metric]
         return [float(part.get(agent, float("nan"))) for agent in agents]
 
     fig, axes = plt.subplots(2, 1, figsize=(9, 8), sharex=True)
 
-    baseline_states = values_for("baseline", "states_examined")
-    od_states = values_for("od", "states_examined")
-    axes[0].bar([v - width / 2 for v in x], baseline_states, width, label=LABELS["baseline"])
-    axes[0].bar([v + width / 2 for v in x], od_states, width, label=LABELS["od"])
-    axes[0].set_ylabel("Mean real states examined")
+    axes[0].bar(
+        [value - width / 2 for value in x],
+        values_for("baseline", "states_examined"),
+        width,
+        label=LABELS["baseline"],
+    )
+    axes[0].bar(
+        [value + width / 2 for value in x],
+        values_for("od", "states_examined"),
+        width,
+        label=LABELS["od"],
+    )
+    axes[0].set_ylabel("Real states examined")
     axes[0].set_title("Search size and policy success")
     axes[0].grid(True, axis="y", alpha=0.3)
     positive = summary["states_examined"].dropna()
@@ -84,10 +96,18 @@ def _plot_states_and_success(summary: pd.DataFrame, output: Path) -> None:
         axes[0].set_yscale("log")
     axes[0].legend()
 
-    baseline_success = values_for("baseline", "success_rate")
-    od_success = values_for("od", "success_rate")
-    axes[1].bar([v - width / 2 for v in x], baseline_success, width, label=LABELS["baseline"])
-    axes[1].bar([v + width / 2 for v in x], od_success, width, label=LABELS["od"])
+    axes[1].bar(
+        [value - width / 2 for value in x],
+        values_for("baseline", "success_rate"),
+        width,
+        label=LABELS["baseline"],
+    )
+    axes[1].bar(
+        [value + width / 2 for value in x],
+        values_for("od", "success_rate"),
+        width,
+        label=LABELS["od"],
+    )
     axes[1].set_xlabel("Number of agents")
     axes[1].set_ylabel("Success rate")
     axes[1].set_ylim(0.0, 1.05)
@@ -101,13 +121,19 @@ def _plot_states_and_success(summary: pd.DataFrame, output: Path) -> None:
 
 
 def comparison_table(df: pd.DataFrame) -> pd.DataFrame:
-    means = df.groupby(["n_agents", "algorithm"], as_index=False)[METRICS].mean()
-    wide = means.pivot(index="n_agents", columns="algorithm", values=METRICS)
-    result = pd.DataFrame(index=wide.index)
+    agents = sorted(df["n_agents"].dropna().astype(int).unique())
+    result = pd.DataFrame({"n_agents": agents}).set_index("n_agents")
     for metric in METRICS:
-        result[f"{metric}_baseline"] = wide[(metric, "baseline")]
-        result[f"{metric}_od"] = wide[(metric, "od")]
-        result[f"{metric}_od_minus_baseline"] = wide[(metric, "od")] - wide[(metric, "baseline")]
+        for algorithm in ("baseline", "od"):
+            values = (
+                df[df["algorithm"] == algorithm]
+                .set_index("n_agents")[metric]
+                .reindex(agents)
+            )
+            result[f"{metric}_{algorithm}"] = values
+        result[f"{metric}_od_minus_baseline"] = (
+            result[f"{metric}_od"] - result[f"{metric}_baseline"]
+        )
     return result.reset_index().round(4)
 
 
@@ -123,13 +149,24 @@ def main() -> None:
     for file in out.glob("*.png"):
         file.unlink()
 
-    df = _load(args.csv_file.resolve(), args.group)
-    summary = _mean(df)
-    _plot_metric(summary, "planning_time_seconds", "Mean planning time (seconds)", "Planning time by number of agents", out / "01_time.png")
-    _plot_metric(summary, "planning_peak_memory_delta_mb", "Mean peak memory increase (MB)", "Planning memory by number of agents", out / "02_memory.png")
+    summary = _load(args.csv_file.resolve(), args.group)
+    _plot_metric(
+        summary,
+        "planning_time_seconds",
+        "Planning time (seconds)",
+        "Planning time by number of agents",
+        out / "01_time.png",
+    )
+    _plot_metric(
+        summary,
+        "planning_peak_memory_delta_mb",
+        "Peak memory increase (MB)",
+        "Planning memory by number of agents",
+        out / "02_memory.png",
+    )
     _plot_states_and_success(summary, out / "03_states_and_success.png")
 
-    print(comparison_table(df).to_string(index=False))
+    print(comparison_table(summary).to_string(index=False))
     print("Created exactly three graphs in", out)
 
 

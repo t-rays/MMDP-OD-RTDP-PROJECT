@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 import threading
-import time
 
 try:
     import psutil

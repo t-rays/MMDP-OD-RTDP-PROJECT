@@ -200,9 +200,6 @@ class GridMMDP:
     def initial_state(self) -> State:
         return self.starts
 
-    def goal_state(self) -> State:
-        return self.goals
-
     def validate_state(self, state: State) -> None:
         if len(state) != self.n_agents:
             raise ValueError(
@@ -803,17 +800,6 @@ class GridMMDP:
             "resolved_writes": self._resolved_transition_cache_writes,
             "resolved_evictions": self._resolved_transition_cache_evictions,
         }
-
-    def clear_transition_cache(self) -> None:
-        """
-        Clear memoized transition distributions.
-
-        This is normally unnecessary because one GridMMDP object represents an
-        immutable environment configuration. It is provided for diagnostics
-        and memory-control experiments.
-        """
-        self._raw_transition_cache.clear()
-        self._resolved_transition_cache.clear()
 
     @staticmethod
     def _validate_probability_sum(
