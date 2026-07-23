@@ -1,28 +1,11 @@
 from __future__ import annotations
 
-"""
-Grid-map and scenario loader for the multi-agent planning project.
-
-Expected project structure:
-
-final_project/
-â””â”€â”€ maps/
-    â””â”€â”€ room-64-64-16/
-        â”œâ”€â”€ room-64-64-16.map
-        â”œâ”€â”€ scen/
-        â”‚   â”œâ”€â”€ room-64-64-16-even-1.scen
-        â”‚   â””â”€â”€ ...
-        â””â”€â”€ room-64-64-16.pdf   # ignored by this module
-
-The scenario directory can have any name. Scenario files are discovered
-recursively under the selected map folder.
-"""
+"""Load MovingAI maps and build fixed multi-agent benchmark instances."""
 
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Sequence
-import argparse
 import re
 
 
@@ -99,17 +82,6 @@ class MapInstance:
     def n_agents(self) -> int:
         return len(self.starts)
 
-    def summary(self) -> str:
-        return (
-            f"Map: {self.grid_map.name}\n"
-            f"Size: {self.grid_map.width} x {self.grid_map.height}\n"
-            f"Free cells: {len(self.grid_map.free_cells):,}\n"
-            f"Obstacles: {len(self.grid_map.obstacles):,}\n"
-            f"Scenario: {self.scenario_file.name}\n"
-            f"Agents: {self.n_agents}\n"
-            f"Starts: {self.starts}\n"
-            f"Goals: {self.goals}"
-        )
 
 
 def _read_nonempty_lines(path: Path) -> list[str]:
@@ -432,79 +404,35 @@ def _reachable_4way(
 
 
 def select_agent_tasks(
-    entries: Sequence[ScenarioEntry],
+    entries: tuple[ScenarioEntry, ...],
     grid_map: GridMap,
     n_agents: int,
     *,
     offset: int = 0,
-    require_unique_starts: bool = True,
-    require_unique_goals: bool = True,
-    require_4way_reachability: bool = True,
 ) -> tuple[ScenarioEntry, ...]:
-    """
-    Select a deterministic valid group of tasks for the requested agents.
-
-    Invalid, duplicate, or unreachable entries are skipped until enough tasks
-    have been collected.
-    """
+    """Select unique, four-way reachable tasks in scenario-file order."""
     if n_agents <= 0:
-        raise MapCreatorError(
-            "n_agents must be positive"
-        )
-
-    if offset < 0:
-        raise MapCreatorError(
-            "offset cannot be negative"
-        )
-
-    if offset >= len(entries):
-        raise MapCreatorError(
-            f"offset={offset} is outside the scenario file "
-            f"with {len(entries)} entries"
-        )
+        raise MapCreatorError("n_agents must be positive")
+    if offset < 0 or offset >= len(entries):
+        raise MapCreatorError("task offset is outside the scenario file")
 
     selected: list[ScenarioEntry] = []
     used_starts: set[Position] = set()
     used_goals: set[Position] = set()
-
     for entry in entries[offset:]:
-        _validate_scenario_entry(
-            entry,
-            grid_map,
-        )
-
-        if (
-            require_unique_starts
-            and entry.start in used_starts
-        ):
+        _validate_scenario_entry(entry, grid_map)
+        if entry.start in used_starts or entry.goal in used_goals:
             continue
-
-        if (
-            require_unique_goals
-            and entry.goal in used_goals
-        ):
+        if not _reachable_4way(grid_map, entry.start, entry.goal):
             continue
-
-        if (
-            require_4way_reachability
-            and not _reachable_4way(
-                grid_map,
-                entry.start,
-                entry.goal,
-            )
-        ):
-            continue
-
         selected.append(entry)
         used_starts.add(entry.start)
         used_goals.add(entry.goal)
-
         if len(selected) == n_agents:
             return tuple(selected)
 
     raise MapCreatorError(
-        f"Could select only {len(selected)} valid tasks, "
-        f"but {n_agents} agents were requested"
+        f"Could select only {len(selected)} valid tasks for {n_agents} agents"
     )
 
 
@@ -512,242 +440,31 @@ def create_map_instance(
     map_folder: str | Path,
     n_agents: int,
     *,
-    scenario_file: str | Path | None = None,
     scenario_number: int = 1,
     task_offset: int = 0,
-    require_4way_reachability: bool = True,
 ) -> MapInstance:
-    """Create one multi-agent instance from a map folder."""
+    """Build one benchmark instance from a map folder and scenario index."""
     folder = Path(map_folder).resolve()
-    map_path = discover_map_file(folder)
-    grid_map = load_map_file(map_path)
-
-    if scenario_file is None:
-        scenario_files = discover_scenario_files(folder)
-
-        if not 1 <= scenario_number <= len(scenario_files):
-            raise MapCreatorError(
-                f"scenario_number must be between 1 and "
-                f"{len(scenario_files)}"
-            )
-
-        selected_scenario_path = scenario_files[
-            scenario_number - 1
-        ]
-    else:
-        scenario_path = Path(scenario_file)
-        selected_scenario_path = (
-            scenario_path
-            if scenario_path.is_absolute()
-            else folder / scenario_path
-        ).resolve()
-
-    entries = load_scenario_file(
-        selected_scenario_path,
-        expected_map=grid_map,
-    )
-
-    tasks = select_agent_tasks(
-        entries,
-        grid_map,
-        n_agents,
-        offset=task_offset,
-        require_4way_reachability=require_4way_reachability,
-    )
-
+    grid_map = load_map_file(discover_map_file(folder))
+    scenario_files = discover_scenario_files(folder)
+    if not 1 <= scenario_number <= len(scenario_files):
+        raise MapCreatorError(
+            f"scenario_number must be between 1 and {len(scenario_files)}"
+        )
+    scenario_path = scenario_files[scenario_number - 1]
+    entries = load_scenario_file(scenario_path, expected_map=grid_map)
+    tasks = select_agent_tasks(entries, grid_map, n_agents, offset=task_offset)
     return MapInstance(
         grid_map=grid_map,
-        scenario_file=selected_scenario_path,
+        scenario_file=scenario_path,
         starts=tuple(task.start for task in tasks),
         goals=tuple(task.goal for task in tasks),
         tasks=tasks,
     )
 
 
-def render_instance(
-    instance: MapInstance,
-    output_path: str | Path,
-) -> Path:
-    """
-    Save a visual validation image.
-
-    If ``output_path`` is a directory, the function creates a default filename
-    inside it, such as ``room-64-64-16_preview.png``.
-    """
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError as exc:
-        raise RuntimeError(
-            "render_instance requires matplotlib. Install it with: "
-            "python -m pip install matplotlib"
-        ) from exc
-
-    output = Path(output_path).resolve()
-
-    if output.exists() and output.is_dir():
-        output = output / (
-            f"{instance.grid_map.name}_preview.png"
-        )
-    elif not output.suffix:
-        output = output / (
-            f"{instance.grid_map.name}_preview.png"
-        )
-
-    output.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    image = [
-        [
-            0
-            if (x, y) in instance.grid_map.free_cells
-            else 1
-            for x in range(instance.grid_map.width)
-        ]
-        for y in range(instance.grid_map.height)
-    ]
-
-    figure, axis = plt.subplots(
-        figsize=(10, 7)
-    )
-
-    axis.imshow(
-        image,
-        cmap="gray_r",
-        interpolation="nearest",
-    )
-
-    start_x = [position[0] for position in instance.starts]
-    start_y = [position[1] for position in instance.starts]
-    goal_x = [position[0] for position in instance.goals]
-    goal_y = [position[1] for position in instance.goals]
-
-    axis.scatter(
-        start_x,
-        start_y,
-        marker="o",
-        label="Starts",
-    )
-
-    axis.scatter(
-        goal_x,
-        goal_y,
-        marker="x",
-        label="Goals",
-    )
-
-    for agent_index, (start, goal) in enumerate(
-        zip(instance.starts, instance.goals),
-        start=1,
-    ):
-        axis.text(
-            start[0],
-            start[1],
-            str(agent_index),
-            fontsize=8,
-        )
-        axis.text(
-            goal[0],
-            goal[1],
-            str(agent_index),
-            fontsize=8,
-        )
-
-    axis.set_title(
-        f"{instance.grid_map.name}: {instance.n_agents} agents"
-    )
-    axis.set_xlim(
-        -0.5,
-        instance.grid_map.width - 0.5,
-    )
-    axis.set_ylim(
-        instance.grid_map.height - 0.5,
-        -0.5,
-    )
-    axis.set_aspect("equal")
-    axis.legend()
-    figure.tight_layout()
-    figure.savefig(
-        output,
-        dpi=180,
-    )
-    plt.close(figure)
-
-    return output
 
 
-def _build_argument_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Create and validate a multi-agent instance from a map folder."
-        )
-    )
-    parser.add_argument(
-        "map_folder",
-        type=Path,
-        help="Folder containing one .map file and scenario files",
-    )
-    parser.add_argument(
-        "--agents",
-        type=int,
-        default=2,
-        help="Number of agent tasks to select (default: 2)",
-    )
-    parser.add_argument(
-        "--scenario-number",
-        type=int,
-        default=1,
-        help="One-based index of discovered .scen files (default: 1)",
-    )
-    parser.add_argument(
-        "--task-offset",
-        type=int,
-        default=0,
-        help="Skip this many scenario rows before selecting tasks",
-    )
-    parser.add_argument(
-        "--preview",
-        type=Path,
-        help="Optional PNG path or output directory",
-    )
-    parser.add_argument(
-        "--allow-non-four-way",
-        action="store_true",
-        help="Do not reject tasks unreachable with four-way movement",
-    )
-    return parser
 
 
-def main() -> None:
-    args = _build_argument_parser().parse_args()
 
-    try:
-        instance = create_map_instance(
-            args.map_folder,
-            args.agents,
-            scenario_number=args.scenario_number,
-            task_offset=args.task_offset,
-            require_4way_reachability=(
-                not args.allow_non_four_way
-            ),
-        )
-    except MapCreatorError as exc:
-        raise SystemExit(
-            f"Map creation failed: {exc}"
-        ) from exc
-
-    print(instance.summary())
-
-    if args.preview is not None:
-        preview_path = render_instance(
-            instance,
-            args.preview,
-        )
-        print(
-            f"Preview image saved to: {preview_path}"
-        )
-
-
-if __name__ == "__main__":
-    main()

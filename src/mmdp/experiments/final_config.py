@@ -1,25 +1,22 @@
 from __future__ import annotations
 
-"""Single source of truth for the final experiment.
-
-The final study intentionally uses one fixed random seed and does not load
-external manifests.  Keeping the complete configuration here makes the run
-reproducible while avoiding a second configuration layer.
-"""
+"""Fixed configuration for the experiment."""
 
 from dataclasses import dataclass
-
 
 FIXED_SEED = 20260708
 ALGORITHMS = ("baseline", "od")
 AGENT_COUNTS = (1, 2, 3, 4, 5, 6)
-
 SLIP_PROBABILITY = 0.20
 PLANNING_TIME_LIMIT_SECONDS = 60.0
 EVALUATION_EPISODES = 5
 EVALUATION_TIME_LIMIT_SECONDS = 8.0
 CONDITION_WATCHDOG_SECONDS = 75.0
 TRANSITION_CACHE_MAX_ENTRIES = 100_000
+STEP_CAP_FAMILYWISE_ERROR = 0.01
+EPSILON = 1e-8
+RELATIVE_EPSILON = 1e-6
+TIE_ULPS = 8
 
 
 @dataclass(frozen=True)

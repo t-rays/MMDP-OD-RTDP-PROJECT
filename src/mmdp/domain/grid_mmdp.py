@@ -65,17 +65,11 @@ MOVE: dict[Action, Position] = {
 class MMDPConfig:
     """Parameters defining the stochastic grid environment.
 
-    ``transition_cache_max_entries`` bounds each of the raw and resolved LRU
-    transition caches.  ``None`` keeps the old unbounded behavior and ``0``
-    disables new cache entries.  Bounding the caches is important on large
-    multi-agent instances, where the number of state-action pairs grows as
-    5**n and an unbounded cache can dominate memory.
+    Each raw and resolved transition cache uses the same LRU entry limit.
     """
 
     slip_to_stay_probability: float = 0.20
-    freeze_agents_at_goal: bool = True
-    reject_conflicting_transitions: bool = True
-    transition_cache_max_entries: int | None = None
+    transition_cache_max_entries: int = 100_000
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.slip_to_stay_probability <= 1.0:
@@ -83,13 +77,8 @@ class MMDPConfig:
                 "slip_to_stay_probability must be between 0 and 1"
             )
 
-        if (
-            self.transition_cache_max_entries is not None
-            and self.transition_cache_max_entries < 0
-        ):
-            raise ValueError(
-                "transition_cache_max_entries must be non-negative or None"
-            )
+        if self.transition_cache_max_entries <= 0:
+            raise ValueError("transition_cache_max_entries must be positive")
 
 
 class GridMMDP:
@@ -122,32 +111,14 @@ class GridMMDP:
         # entries without filling the cache with every rejected candidate.
         self._transition_cache_write_enabled = True
 
-        self._raw_transition_cache_hits = 0
-        self._raw_transition_cache_misses = 0
-        self._raw_transition_cache_writes = 0
-        self._raw_transition_cache_evictions = 0
-        self._resolved_transition_cache_hits = 0
-        self._resolved_transition_cache_misses = 0
-        self._resolved_transition_cache_writes = 0
-        self._resolved_transition_cache_evictions = 0
-
         self._validate_instance()
 
     @property
     def map_name(self) -> str:
         return self.instance.grid_map.name
 
-    @property
-    def width(self) -> int:
-        return self.instance.grid_map.width
 
-    @property
-    def height(self) -> int:
-        return self.instance.grid_map.height
 
-    @property
-    def obstacles(self) -> frozenset[Position]:
-        return self.instance.grid_map.obstacles
 
     @property
     def free_cells(self) -> frozenset[Position]:
@@ -299,10 +270,7 @@ class GridMMDP:
                 f"Position {position} is not a free cell"
             )
 
-        if (
-            self.config.freeze_agents_at_goal
-            and position == self.goals[agent_index]
-        ):
+        if position == self.goals[agent_index]:
             return position
 
         dx, dy = MOVE[action]
@@ -385,112 +353,44 @@ class GridMMDP:
         ],
         key: tuple[State, JointAction],
         value: tuple[Transition, ...],
-        *,
-        raw: bool,
-    ) -> bool:
-        """Store one transition distribution and enforce the LRU bound."""
+    ) -> None:
         if not self._transition_cache_write_enabled:
-            return False
-
-        limit = self.config.transition_cache_max_entries
-        if limit == 0:
-            return False
-
+            return
         cache[key] = value
         cache.move_to_end(key)
-
-        if limit is not None and len(cache) > limit:
+        if len(cache) > self.config.transition_cache_max_entries:
             cache.popitem(last=False)
-            if raw:
-                self._raw_transition_cache_evictions += 1
-            else:
-                self._resolved_transition_cache_evictions += 1
-
-        return True
 
     def _raw_joint_transitions(
         self,
         state: State,
         joint_action: JointAction,
     ) -> tuple[Transition, ...]:
-        """
-        Return joint outcomes before applying the collision rejection rule.
-
-        The distribution is cached because it depends only on the immutable
-        MMDP definition, the current state, and the joint action.
-        """
-        # Callers validate once before entering this private hot path.
-        cache_key = (
-            state,
-            joint_action,
-        )
-
-        cached = self._cache_lookup(
-            self._raw_transition_cache,
-            cache_key,
-        )
-
+        cache_key = (state, joint_action)
+        cached = self._cache_lookup(self._raw_transition_cache, cache_key)
         if cached is not None:
-            self._raw_transition_cache_hits += 1
             return cached
 
-        self._raw_transition_cache_misses += 1
-
         if self.is_terminal(state):
-            terminal_transition = ((state, 1.0),)
-            if self._cache_store(
-                self._raw_transition_cache,
-                cache_key,
-                terminal_transition,
-                raw=True,
-            ):
-                self._raw_transition_cache_writes += 1
-            return terminal_transition
-
-        per_agent_outcomes = [
-            self.individual_outcomes(
-                agent_index,
-                position,
-                action,
+            transitions = ((state, 1.0),)
+        else:
+            per_agent_outcomes = [
+                self.individual_outcomes(agent_index, position, action)
+                for agent_index, (position, action) in enumerate(zip(state, joint_action))
+            ]
+            merged: dict[State, float] = defaultdict(float)
+            for combination in product(*per_agent_outcomes):
+                next_state = tuple(position for position, _ in combination)
+                probability = math.prod(probability for _, probability in combination)
+                merged[next_state] += probability
+            transitions = tuple(
+                (next_state, probability)
+                for next_state, probability in merged.items()
+                if probability > 0.0
             )
-            for agent_index, (position, action)
-            in enumerate(zip(state, joint_action))
-        ]
+            self._validate_probability_sum(transitions, label="Raw joint")
 
-        merged: dict[State, float] = defaultdict(float)
-
-        for combination in product(*per_agent_outcomes):
-            next_state: State = tuple(
-                position
-                for position, _ in combination
-            )
-
-            probability = math.prod(
-                outcome_probability
-                for _, outcome_probability in combination
-            )
-
-            merged[next_state] += probability
-
-        transitions = tuple(
-            (next_state, probability)
-            for next_state, probability in merged.items()
-            if probability > 0.0
-        )
-
-        self._validate_probability_sum(
-            transitions,
-            label="Raw joint",
-        )
-
-        if self._cache_store(
-            self._raw_transition_cache,
-            cache_key,
-            transitions,
-            raw=True,
-        ):
-            self._raw_transition_cache_writes += 1
-
+        self._cache_store(self._raw_transition_cache, cache_key, transitions)
         return transitions
 
     @staticmethod
@@ -543,9 +443,8 @@ class GridMMDP:
     ) -> bool:
         """Return True for a vertex conflict or an edge-swap conflict.
 
-        This boolean check is on the transition-generation hot path.  It uses
-        early exits instead of constructing full conflict counts, while the
-        public counting helpers remain available for diagnostics.
+        The transition-generation hot path uses early exits instead of
+        constructing complete conflict counts.
         """
         if len(set(next_state)) != len(next_state):
             return True
@@ -603,155 +502,31 @@ class GridMMDP:
         )
 
 
-    def action_risk_breakdown(
-        self,
-        state: State,
-        joint_action: JointAction,
-    ) -> dict[str, float | int]:
-        """Return an interpretable breakdown of one joint action.
-
-        Probabilities are computed from raw stochastic outcomes, before the
-        collision-rejection rule merges them into the current state.  The
-        categories are mutually interpretable but not all are mutually
-        exclusive: ``self_loop_probability`` is the final resolved probability
-        of staying in the same joint state, while vertex/edge probabilities
-        identify the collision component and ``noncollision_no_motion``
-        identifies raw outcomes that already equal the current state.
-        """
-        self.validate_state(state)
-        self.validate_joint_action(joint_action)
-
-        vertex_probability = 0.0
-        edge_swap_probability = 0.0
-        any_conflict_probability = 0.0
-        noncollision_no_motion_probability = 0.0
-
-        for raw_next_state, probability in self._raw_joint_transitions(
-            state, joint_action
-        ):
-            vertex = self.vertex_conflict_count(raw_next_state) > 0
-            edge = self.edge_swap_conflict_count(state, raw_next_state) > 0
-            if vertex:
-                vertex_probability += probability
-            if edge:
-                edge_swap_probability += probability
-            if vertex or edge:
-                any_conflict_probability += probability
-            elif raw_next_state == state:
-                noncollision_no_motion_probability += probability
-
-        unfinished_stay_actions = 0
-        unfinished_blocked_actions = 0
-        movable_unfinished_actions = 0
-        frozen_agents = 0
-
-        for index, (position, action, goal) in enumerate(
-            zip(state, joint_action, self.goals)
-        ):
-            if position == goal and self.config.freeze_agents_at_goal:
-                frozen_agents += 1
-                continue
-            if action == "stay":
-                unfinished_stay_actions += 1
-                continue
-            intended = self.move_one(index, position, action)
-            if intended == position:
-                unfinished_blocked_actions += 1
-            else:
-                movable_unfinished_actions += 1
-
-        return {
-            "self_loop_probability": self.self_loop_probability(
-                state, joint_action
-            ),
-            "conflict_probability": any_conflict_probability,
-            "vertex_conflict_probability": vertex_probability,
-            "edge_swap_probability": edge_swap_probability,
-            "noncollision_no_motion_probability": (
-                noncollision_no_motion_probability
-            ),
-            "unfinished_stay_actions": unfinished_stay_actions,
-            "unfinished_blocked_actions": unfinished_blocked_actions,
-            "movable_unfinished_actions": movable_unfinished_actions,
-            "frozen_agents": frozen_agents,
-        }
 
     def joint_transitions(
         self,
         state: State,
         joint_action: JointAction,
     ) -> tuple[Transition, ...]:
-        """
-        Return every legal resolved successor and its probability.
-
-        When collision rejection is enabled, each conflicting raw outcome is
-        converted into a transition back to the current state. Duplicate
-        successors are then merged. The resolved distribution is memoized.
-        """
+        """Return the collision-resolved successor distribution."""
         self.validate_state(state)
         self.validate_joint_action(joint_action)
-
-        cache_key = (
-            state,
-            joint_action,
-        )
-
-        cached = self._cache_lookup(
-            self._resolved_transition_cache,
-            cache_key,
-        )
-
+        cache_key = (state, joint_action)
+        cached = self._cache_lookup(self._resolved_transition_cache, cache_key)
         if cached is not None:
-            self._resolved_transition_cache_hits += 1
             return cached
 
-        self._resolved_transition_cache_misses += 1
-
-        raw_transitions = self._raw_joint_transitions(
-            state,
-            joint_action,
-        )
-
-        if not self.config.reject_conflicting_transitions:
-            if self._cache_store(
-                self._resolved_transition_cache,
-                cache_key,
-                raw_transitions,
-                raw=False,
-            ):
-                self._resolved_transition_cache_writes += 1
-            return raw_transitions
-
         merged: dict[State, float] = defaultdict(float)
-
-        for raw_next_state, probability in raw_transitions:
-            resolved_state = (
-                state
-                if self.has_conflict(state, raw_next_state)
-                else raw_next_state
-            )
-
-            merged[resolved_state] += probability
-
+        for raw_next_state, probability in self._raw_joint_transitions(state, joint_action):
+            next_state = state if self.has_conflict(state, raw_next_state) else raw_next_state
+            merged[next_state] += probability
         transitions = tuple(
             (next_state, probability)
             for next_state, probability in merged.items()
             if probability > 0.0
         )
-
-        self._validate_probability_sum(
-            transitions,
-            label="Resolved joint",
-        )
-
-        if self._cache_store(
-            self._resolved_transition_cache,
-            cache_key,
-            transitions,
-            raw=False,
-        ):
-            self._resolved_transition_cache_writes += 1
-
+        self._validate_probability_sum(transitions, label="Resolved joint")
+        self._cache_store(self._resolved_transition_cache, cache_key, transitions)
         return transitions
 
     @contextmanager
@@ -773,33 +548,7 @@ class GridMMDP:
         finally:
             self._transition_cache_write_enabled = previous
 
-    def reset_transition_cache_stats(self) -> None:
-        """Reset hit/miss/write counters without clearing distributions."""
-        self._raw_transition_cache_hits = 0
-        self._raw_transition_cache_misses = 0
-        self._raw_transition_cache_writes = 0
-        self._raw_transition_cache_evictions = 0
-        self._resolved_transition_cache_hits = 0
-        self._resolved_transition_cache_misses = 0
-        self._resolved_transition_cache_writes = 0
-        self._resolved_transition_cache_evictions = 0
 
-    def transition_cache_stats(self) -> dict[str, int | bool | None]:
-        """Return cache sizes and counters for performance diagnostics."""
-        return {
-            "write_enabled": self._transition_cache_write_enabled,
-            "max_entries_per_cache": self.config.transition_cache_max_entries,
-            "raw_entries": len(self._raw_transition_cache),
-            "resolved_entries": len(self._resolved_transition_cache),
-            "raw_hits": self._raw_transition_cache_hits,
-            "raw_misses": self._raw_transition_cache_misses,
-            "raw_writes": self._raw_transition_cache_writes,
-            "raw_evictions": self._raw_transition_cache_evictions,
-            "resolved_hits": self._resolved_transition_cache_hits,
-            "resolved_misses": self._resolved_transition_cache_misses,
-            "resolved_writes": self._resolved_transition_cache_writes,
-            "resolved_evictions": self._resolved_transition_cache_evictions,
-        }
 
     @staticmethod
     def _validate_probability_sum(
@@ -861,19 +610,3 @@ class GridMMDP:
             repeat=self.n_agents,
         )
 
-    def summary(self) -> str:
-        return (
-            f"MMDP map: {self.map_name}\n"
-            f"Size: {self.width} x {self.height}\n"
-            f"Agents: {self.n_agents}\n"
-            f"Scenario: {self.instance.scenario_file.name}\n"
-            f"Slip-to-stay probability: "
-            f"{self.config.slip_to_stay_probability:.2f}\n"
-            f"Freeze agents at goal: "
-            f"{self.config.freeze_agents_at_goal}\n"
-            f"Reject conflicting transitions: "
-            f"{self.config.reject_conflicting_transitions}\n"
-            f"Transition cache max entries per cache: "
-            f"{self.config.transition_cache_max_entries}\n"
-            "Transition cost: number of unfinished agents"
-        )

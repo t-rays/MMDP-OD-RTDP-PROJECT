@@ -1,5 +1,6 @@
-"""Experiment orchestration: run conditions, build CSV rows, resume safely."""
+"""Fixed experiment configuration and execution helpers."""
 
-from mmdp.experiments.runner import run_experiments
+from mmdp.experiments.final_config import FINAL_MAPS, FIXED_SEED
+from mmdp.experiments.runner import run_condition
 
-__all__ = ["run_experiments"]
+__all__ = ["FINAL_MAPS", "FIXED_SEED", "run_condition"]

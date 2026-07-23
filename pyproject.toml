@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mmdp"
 version = "1.0.0"
-description = "Baseline RTDP vs OD-RTDP on multi-agent MDP gridworlds (MovingAI maps)"
+description = "Baseline RTDP and OD-RTDP for stochastic multi-agent path finding"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

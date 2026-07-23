@@ -274,8 +274,7 @@ class ShortestPathHeuristic:
             if math.isinf(distance):
                 self._state_value_cache[state] = math.inf
                 return math.inf
-            # Preserve the original operation order exactly: each agent's
-            # distance is divided before the contributions are accumulated.
+            # Divide each agent's distance before accumulating the joint value.
             total += distance / self.movement_success_probability
 
         result = total
