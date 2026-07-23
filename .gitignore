@@ -5,8 +5,6 @@ __pycache__/
 .pytest_cache/
 results/
 local_results/
-graphs/
-validation/
 *.log
 *.tmp
 .DS_Store
